@@ -1,0 +1,221 @@
+﻿@using Azure.Messaging.ServiceBus.Administration
+@using EventBusViewer.Client.Services
+@inject QueueService QueueService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"/>
+            <MudText Typo="Typo.h6">Edit Queue</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@QueueName</MudChip>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading || _saving)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+        }
+
+        @if (_loadError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+        }
+        else if (_props is not null)
+        {
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+                <MudStack Spacing="4">
+
+                    @* ── Name ── *@
+                    <MudTextField T="string"
+                                  @bind-Value="_name"
+                                  Label="Queue Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Queue name is required."
+                                  Immediate="true"
+                                  Disabled="_saving"
+                                  Error="@(_nameError is not null)"
+                                  ErrorText="@_nameError"
+                                  OnBlur="@(_ => _nameError = null)"/>
+
+                    @* ── Rename warning ── *@
+                    @if (IsRename)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                            Renaming <strong>creates a new queue</strong> and <strong>deletes the original</strong>.
+                            All existing messages will be <strong>permanently lost</strong>.
+                        </MudAlert>
+                    }
+
+                    @* ── Editable settings ── *@
+                    <MudSelect T="EntityStatus"
+                               Value="_status"
+                               ValueChanged="@((EntityStatus v) => _status = v)"
+                               Label="Status"
+                               Variant="Variant.Outlined"
+                               Disabled="_saving"
+                               HelperText="Active allows full use. Disabled blocks all operations. SendDisabled / ReceiveDisabled restrict one direction.">
+                        <MudSelectItem Value="EntityStatus.Active">Active</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.Disabled">Disabled</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.SendDisabled">Send Disabled</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.ReceiveDisabled">Receive Disabled</MudSelectItem>
+                    </MudSelect>
+
+                    <MudNumericField T="int"
+                                     @bind-Value="_maxDeliveryCount"
+                                     Label="Max Delivery Count"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Required="true"
+                                     Disabled="_saving"
+                                     HelperText="How many times delivery is attempted before the message is dead-lettered."/>
+
+                    <MudNumericField T="int"
+                                     @bind-Value="_lockDurationSeconds"
+                                     Label="Lock Duration (seconds)"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Max="300"
+                                     Required="true"
+                                     Disabled="_saving"
+                                     HelperText="How long a received message stays locked (1 – 300 s)."/>
+
+                    <MudSwitch T="bool"
+                               @bind-Value="_deadLetterOnExpiry"
+                               Label="Dead-letter on Message Expiry"
+                               Color="Color.Primary"
+                               Disabled="_saving"/>
+
+                </MudStack>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel"
+                   Variant="Variant.Text"
+                   Disabled="_saving">
+            Cancel
+        </MudButton>
+        <MudButton OnClick="SaveAsync"
+                   Variant="Variant.Filled"
+                   Color="@(IsRename ? Color.Warning : Color.Primary)"
+                   StartIcon="@(_saving ? null : Icons.Material.Filled.Save)"
+                   ButtonType="ButtonType.Button"
+                   Disabled="@(_loading || _saving || !_formValid || _loadError is not null)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <span>@(IsRename ? "Renaming…" : "Saving…")</span>
+            }
+            else
+            {
+                <span>@(IsRename ? "Rename & Save" : "Save")</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired] public string QueueName { get; set; } = string.Empty;
+
+    private MudForm _form = null!;
+    private bool _formValid = true;
+
+    private QueueProperties? _props;
+    private string? _loadError;
+    private string? _nameError;
+    private bool _loading;
+    private bool _saving;
+
+    private string? _name;
+    private int _maxDeliveryCount;
+    private int _lockDurationSeconds;
+    private bool _deadLetterOnExpiry;
+
+    private EntityStatus _status;
+
+    private bool IsRename => !string.IsNullOrWhiteSpace(_name)
+                             && _name.Trim() != QueueName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            _props = await QueueService.GetQueuePropertiesAsync(QueueName);
+            _name                = _props.Name;
+            _maxDeliveryCount    = _props.MaxDeliveryCount;
+            _lockDurationSeconds = (int)_props.LockDuration.TotalSeconds;
+            _deadLetterOnExpiry  = _props.DeadLetteringOnMessageExpiration;
+            _status              = _props.Status;
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to load queue properties: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            await _form.ValidateAsync();
+            if (!_formValid) return;
+
+            // Apply editable settings to the live properties object
+            _props!.MaxDeliveryCount                = _maxDeliveryCount;
+            _props.LockDuration                     = TimeSpan.FromSeconds(_lockDurationSeconds);
+            _props.DeadLetteringOnMessageExpiration = _deadLetterOnExpiry;
+            _props.Status                           = _status;
+
+            if (IsRename)
+            {
+                string newName = _name!.Trim();
+
+                // Ensure new name is not already taken
+                if (await QueueService.QueueExistsAsync(newName))
+                {
+                    _nameError = $"A queue named \"{newName}\" already exists.";
+                    return;
+                }
+
+                // Create new queue with updated settings, then delete the original
+                await QueueService.CreateQueueAsync(
+                    newName,
+                    _props.RequiresSession,
+                    _props.MaxDeliveryCount,
+                    (int)_props.LockDuration.TotalSeconds,
+                    _props.DeadLetteringOnMessageExpiration);
+
+                await QueueService.DeleteQueueAsync(QueueName);
+
+                Snackbar.Add($"Queue renamed to \"{newName}\" successfully.", Severity.Success);
+            }
+            else
+            {
+                await QueueService.UpdateQueueAsync(_props);
+                Snackbar.Add($"Queue \"{QueueName}\" updated successfully.", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save queue: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

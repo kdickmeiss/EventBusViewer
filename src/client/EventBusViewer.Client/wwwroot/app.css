@@ -1,5 +1,3 @@
-/* MudBlazor handles most styling — keep only essentials */
-
 /* Prevent visited links from turning purple — respect MudBlazor theme colors */
 a:visited {
     color: inherit !important;

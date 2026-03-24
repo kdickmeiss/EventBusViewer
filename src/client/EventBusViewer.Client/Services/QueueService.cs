@@ -20,7 +20,7 @@ public sealed class QueueService(
             int active = await CountMessagesAsync(queue.Name, fromDeadLetter: false, cancellationToken);
             int deadLetter = await CountMessagesAsync(queue.Name, fromDeadLetter: true, cancellationToken);
 
-            queues.Add(new QueueInfo(queue.Name, active, deadLetter));
+            queues.Add(new QueueInfo(queue.Name, active, deadLetter, queue.Status));
         }
 
         return queues;

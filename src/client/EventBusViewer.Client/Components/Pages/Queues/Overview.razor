@@ -1,20 +1,31 @@
 @page "/queues/overview"
+@using EventBusViewer.Client.Components.Shared
 @using EventBusViewer.Client.Models
 @using EventBusViewer.Client.Services
+@using Azure.Messaging.ServiceBus.Administration
 @inject QueueService QueueService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Queues Overview</PageTitle>
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Queues Overview</MudText>
     <MudSpacer/>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.AddCircle"
+               OnClick="OpenCreateDialogAsync"
+               Disabled="_loading">
+        New Queue
+    </MudButton>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                    Color="Color.Primary"
                    OnClick="LoadQueuesAsync"
                    Disabled="_loading"
                    title="Refresh queues"/>
 </MudStack>
+
 
 <MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
     Monitor and inspect all active queues on the event bus.
@@ -100,9 +111,13 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Name)">Name</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.DeadLetterMessages)">Dead-letter</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel></MudTh>
+        <MudTh Style="width:50px"></MudTh>
+        <MudTh Style="width:50px"></MudTh>
+        <MudTh Style="width:50px"></MudTh>
         <MudTh Style="width:50px"></MudTh>
     </HeaderContent>
     <RowTemplate>
@@ -114,6 +129,14 @@
                        Href="@($"/queues/{Uri.EscapeDataString(context.Name)}")">
                 @context.Name
             </MudButton>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string"
+                     Color="@StatusColor(context.Status)"
+                     Size="Size.Small"
+                     Variant="Variant.Filled">
+                @context.Status.ToString()
+            </MudChip>
         </MudTd>
         <MudTd DataLabel="Active" Style="text-align:right">
             <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
@@ -130,6 +153,33 @@
         </MudTd>
         <MudTd DataLabel="Total" Style="text-align:right">
             <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Send message to queue">
+                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                               Size="Size.Small"
+                               Color="Color.Secondary"
+                               title="Send message"
+                               OnClick="@(() => OpenSendDialogAsync(context.Name))"/>
+            </MudTooltip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Edit queue settings">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               title="Edit queue"
+                               OnClick="@(() => OpenUpdateDialogAsync(context.Name))"/>
+            </MudTooltip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Delete queue">
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               title="Delete queue"
+                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))"/>
+            </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
             <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
@@ -155,6 +205,7 @@
     private async Task LoadQueuesAsync()
     {
         _loading = true;
+        StateHasChanged(); // flush the loading state before the fetch so the table indicator appears immediately
         _error = null;
 
         try
@@ -175,6 +226,104 @@
     }
 
     /// <summary>
+    /// Opens the create-queue dialog and refreshes the list on success.
+    /// </summary>
+    private async Task OpenCreateDialogAsync()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<CreateQueueDialog>("", options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadQueuesAsync();
+    }
+
+    /// <summary>
+    /// Opens the update-queue dialog and refreshes the list on success.
+    /// </summary>
+    private async Task OpenUpdateDialogAsync(string queueName)
+    {
+        var parameters = new DialogParameters<UpdateQueueDialog>
+        {
+            { x => x.QueueName, queueName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<UpdateQueueDialog>(
+            "", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadQueuesAsync();
+    }
+
+    /// <summary>
+    /// Opens the delete-queue confirmation dialog and refreshes the list on success.
+    /// </summary>
+    private async Task OpenDeleteDialogAsync(string queueName)
+    {
+        var parameters = new DialogParameters<DeleteQueueDialog>
+        {
+            { x => x.QueueName, queueName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<DeleteQueueDialog>(
+            "Confirm Deletion", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadQueuesAsync();
+    }
+
+    /// <summary>
+    /// Opens the send-message dialog for the given queue.
+    /// </summary>
+    private async Task OpenSendDialogAsync(string queueName)
+    {
+        var parameters = new DialogParameters<SendMessageDialog>
+        {
+            { x => x.QueueName, queueName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<SendMessageDialog>(
+            $"Send Message — {queueName}", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadQueuesAsync();
+    }
+
+    /// <summary>
     /// Client-side filter for the search text field.
     /// </summary>
     private bool FilterFunc(QueueInfo queue) =>
@@ -185,4 +334,13 @@
     /// Peek caps at 250 — show "250+" when we hit the cap.
     /// </summary>
     private static string FormatCount(int count) => count >= 250 ? "250+" : count.ToString();
+
+    private static Color StatusColor(EntityStatus status)
+    {
+        if (status == EntityStatus.Active)          return Color.Success;
+        if (status == EntityStatus.Disabled)        return Color.Error;
+        if (status == EntityStatus.SendDisabled)    return Color.Warning;
+        if (status == EntityStatus.ReceiveDisabled) return Color.Warning;
+        return Color.Default;
+    }
 }

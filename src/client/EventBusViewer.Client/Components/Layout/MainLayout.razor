@@ -17,20 +17,9 @@
 
     <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
         <MudNavMenu Bordered="true" Color="Color.Primary">
-            <MudNavGroup Title="Queues" Icon="@Icons.Material.Filled.Queue" Expanded="true">
-                <MudNavLink Href="/queues/overview" Icon="@Icons.Material.Filled.Dashboard" Match="NavLinkMatch.All">
-                    Overview
-                </MudNavLink>
-                <MudNavLink Href="/queues/create" Icon="@Icons.Material.Filled.AddCircle" Match="NavLinkMatch.All">
-                    Create
-                </MudNavLink>
-                <MudNavLink Href="/queues/update" Icon="@Icons.Material.Filled.Edit" Match="NavLinkMatch.All">
-                    Update
-                </MudNavLink>
-                <MudNavLink Href="/queues/delete" Icon="@Icons.Material.Filled.Delete" Match="NavLinkMatch.All">
-                    Delete
-                </MudNavLink>
-            </MudNavGroup>
+            <MudNavLink Href="/queues/overview" Icon="@Icons.Material.Filled.Queue" Match="NavLinkMatch.Prefix">
+                Queues
+            </MudNavLink>
         </MudNavMenu>
     </MudDrawer>
 

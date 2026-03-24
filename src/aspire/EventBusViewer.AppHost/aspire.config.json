@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "EventBusViewer.AppHost.csproj"
+  }
+}

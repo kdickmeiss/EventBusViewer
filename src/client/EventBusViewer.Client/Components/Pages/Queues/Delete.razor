@@ -1,0 +1,55 @@
+@page "/queues/delete"
+
+<PageTitle>Delete Queue</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Delete Queue</MudText>
+<MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+    Permanently remove a queue from the event bus.
+</MudText>
+
+<MudPaper Class="pa-6" MaxWidth="600px" Elevation="2">
+    <MudStack Spacing="4">
+        <MudSelect @bind-Value="_selectedQueue"
+                   Label="Select Queue"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   RequiredError="Please select a queue"
+                   Placeholder="Choose a queue to delete">
+            @* TODO: populate from API *@
+        </MudSelect>
+
+        @if (!string.IsNullOrEmpty(_selectedQueue))
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                This action is <strong>irreversible</strong>. All messages in the queue will be permanently deleted.
+            </MudAlert>
+        }
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                   OnClick="HandleDelete"
+                   Disabled="_submitting || string.IsNullOrEmpty(_selectedQueue)">
+            @if (_submitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+            }
+            Delete Queue
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string? _selectedQueue;
+    private bool _submitting;
+
+    private async Task HandleDelete()
+    {
+        _submitting = true;
+        // TODO: call API to delete queue
+        await Task.Delay(500); // simulate
+        _submitting = false;
+        _selectedQueue = null;
+    }
+}
+

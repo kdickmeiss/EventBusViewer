@@ -1,0 +1,36 @@
+﻿@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>Error</PageTitle>
+
+<MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+    <MudText Typo="Typo.h5">Error</MudText>
+    <MudText Typo="Typo.body1">An error occurred while processing your request.</MudText>
+</MudAlert>
+
+@if (ShowRequestId)
+{
+    <MudText Typo="Typo.body2" Class="mt-2">
+        <strong>Request ID:</strong> <code>@RequestId</code>
+    </MudText>
+}
+
+<MudText Typo="Typo.h6" Class="mt-4">Development Mode</MudText>
+<MudText Typo="Typo.body2" Class="mt-2">
+    Swapping to the <strong>Development</strong> environment will display more detailed information about the error that occurred.
+</MudText>
+<MudText Typo="Typo.body2" Class="mt-2">
+    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
+    It can result in displaying sensitive information from exceptions to end users.
+</MudText>
+
+@code{
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+
+}

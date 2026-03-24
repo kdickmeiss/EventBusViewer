@@ -1,0 +1,142 @@
+@using System.Text.Json
+@using Azure.Messaging.ServiceBus
+@inject IDialogService DialogService
+
+<MudCard Elevation="1" Class="mb-3">
+    <MudCardHeader>
+        <CardHeaderAvatar>
+            <MudAvatar Color="@(IsDeadLetter ? Color.Error : Color.Primary)" Size="Size.Small" Variant="Variant.Outlined">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small"/>
+            </MudAvatar>
+        </CardHeaderAvatar>
+        <CardHeaderContent>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.subtitle1">#@Message.SequenceNumber</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Message.EnqueuedTime.ToString("yyyy-MM-dd HH:mm:ss zzz")</MudText>
+            </MudStack>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-family: monospace;">@Message.MessageId</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudTooltip Text="View full message">
+                <MudIconButton Icon="@Icons.Material.Filled.OpenInFull"
+                               OnClick="OpenMessageDialog"
+                               Size="Size.Small"
+                               Color="Color.Primary"/>
+            </MudTooltip>
+        </CardHeaderActions>
+    </MudCardHeader>
+
+    <MudCardContent Class="pt-0">
+        @* ── Key message properties — matching console app layout ── *@
+        <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
+            <tbody>
+                <tr>
+                    <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Secondary">Message ID</MudText></td>
+                    <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@Message.MessageId</MudText></td>
+                </tr>
+                <tr>
+                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Correlation ID</MudText></td>
+                    <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@(Message.CorrelationId ?? "—")</MudText></td>
+                </tr>
+                <tr>
+                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Content Type</MudText></td>
+                    <td><MudText Typo="Typo.body2">@(Message.ContentType ?? "—")</MudText></td>
+                </tr>
+                <tr>
+                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Enqueued</MudText></td>
+                    <td><MudText Typo="Typo.body2">@Message.EnqueuedTime.ToString("yyyy-MM-dd HH:mm:ss zzz")</MudText></td>
+                </tr>
+                <tr>
+                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Sequence #</MudText></td>
+                    <td><MudText Typo="Typo.body2">@Message.SequenceNumber</MudText></td>
+                </tr>
+                <tr>
+                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Delivery Count</MudText></td>
+                    <td><MudText Typo="Typo.body2">@Message.DeliveryCount</MudText></td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+
+        @* ── Dead-letter details ── *@
+        @if (IsDeadLetter)
+        {
+            <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Error">DL Reason</MudText></td>
+                        <td><MudText Typo="Typo.body2">@(Message.DeadLetterReason ?? "—")</MudText></td>
+                    </tr>
+                    <tr>
+                        <td><MudText Typo="Typo.body2" Color="Color.Error">DL Description</MudText></td>
+                        <td><MudText Typo="Typo.body2">@(Message.DeadLetterErrorDescription ?? "—")</MudText></td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        }
+
+        @* ── Application Properties ── *@
+        @if (Message.ApplicationProperties.Count > 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Application Properties</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
+                <tbody>
+                    @foreach (KeyValuePair<string, object> prop in Message.ApplicationProperties)
+                    {
+                        <tr>
+                            <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Secondary">@prop.Key</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@(prop.Value?.ToString() ?? "null")</MudText></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+
+        @* ── Body ── *@
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Body</MudText>
+        <MudPaper Class="pa-3" Elevation="0" Style="background: var(--mud-palette-surface); border-radius: 4px; overflow-x: auto; max-height: 200px; overflow-y: auto;">
+            <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color: var(--mud-palette-text-primary);">@FormatBody()</pre>
+        </MudPaper>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public ServiceBusReceivedMessage Message { get; set; } = null!;
+    [Parameter] public bool IsDeadLetter { get; set; }
+
+    private string FormatBody()
+    {
+        string raw = Message.Body?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(raw))
+            return "(empty)";
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+
+    private async Task OpenMessageDialog()
+    {
+        var parameters = new DialogParameters<MessageDetailDialog>
+        {
+            { x => x.Message, Message },
+            { x => x.IsDeadLetter, IsDeadLetter }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<MessageDetailDialog>(
+            $"Message #{Message.SequenceNumber}", parameters, options);
+    }
+}

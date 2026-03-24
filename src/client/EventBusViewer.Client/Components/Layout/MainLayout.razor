@@ -1,0 +1,51 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider IsDarkMode="true"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+<MudLayout>
+    <MudAppBar Elevation="4" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer"/>
+        <MudText Typo="Typo.h6" Class="ml-2">EventBus Viewer</MudText>
+        <MudSpacer/>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
+        <MudNavMenu Bordered="true" Color="Color.Primary">
+            <MudNavGroup Title="Queues" Icon="@Icons.Material.Filled.Queue" Expanded="true">
+                <MudNavLink Href="/queues/overview" Icon="@Icons.Material.Filled.Dashboard" Match="NavLinkMatch.All">
+                    Overview
+                </MudNavLink>
+                <MudNavLink Href="/queues/create" Icon="@Icons.Material.Filled.AddCircle" Match="NavLinkMatch.All">
+                    Create
+                </MudNavLink>
+                <MudNavLink Href="/queues/update" Icon="@Icons.Material.Filled.Edit" Match="NavLinkMatch.All">
+                    Update
+                </MudNavLink>
+                <MudNavLink Href="/queues/delete" Icon="@Icons.Material.Filled.Delete" Match="NavLinkMatch.All">
+                    Delete
+                </MudNavLink>
+            </MudNavGroup>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

@@ -1,0 +1,66 @@
+@page "/queues/update"
+
+<PageTitle>Update Queue</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Update Queue</MudText>
+<MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+    Modify settings for an existing queue.
+</MudText>
+
+<MudPaper Class="pa-6" MaxWidth="600px" Elevation="2">
+    <MudForm @ref="_form">
+        <MudStack Spacing="4">
+            <MudSelect @bind-Value="_selectedQueue"
+                       Label="Select Queue"
+                       Variant="Variant.Outlined"
+                       Required="true"
+                       RequiredError="Please select a queue"
+                       Placeholder="Choose a queue to update">
+                @* TODO: populate from API *@
+            </MudSelect>
+
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Placeholder="Updated description"/>
+
+            <MudSwitch @bind-Value="_enableDeadLetter"
+                       Label="Enable dead-letter queue"
+                       Color="Color.Primary"/>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="HandleUpdate"
+                       Disabled="_submitting || string.IsNullOrEmpty(_selectedQueue)">
+                @if (_submitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                }
+                Save Changes
+            </MudButton>
+        </MudStack>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm _form = null!;
+    private string? _selectedQueue;
+    private string? _description;
+    private bool _enableDeadLetter;
+    private bool _submitting;
+
+    private async Task HandleUpdate()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        // TODO: call API to update queue
+        await Task.Delay(500); // simulate
+        _submitting = false;
+    }
+}
+
+

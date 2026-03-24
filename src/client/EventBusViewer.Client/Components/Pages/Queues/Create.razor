@@ -1,0 +1,64 @@
+@page "/queues/create"
+
+<PageTitle>Create Queue</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Create Queue</MudText>
+<MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+    Create a new queue on the event bus.
+</MudText>
+
+<MudPaper Class="pa-6" MaxWidth="600px" Elevation="2">
+    <MudForm @ref="_form">
+        <MudStack Spacing="4">
+            <MudTextField @bind-Value="_queueName"
+                          Label="Queue Name"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="Queue name is required"
+                          Placeholder="e.g. orders.created"/>
+
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Placeholder="Optional description for this queue"/>
+
+            <MudSwitch @bind-Value="_enableDeadLetter"
+                       Label="Enable dead-letter queue"
+                       Color="Color.Primary"/>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddCircle"
+                       OnClick="HandleCreate"
+                       Disabled="_submitting">
+                @if (_submitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                }
+                Create Queue
+            </MudButton>
+        </MudStack>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm _form = null!;
+    private string? _queueName;
+    private string? _description;
+    private bool _enableDeadLetter;
+    private bool _submitting;
+
+    private async Task HandleCreate()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        // TODO: call API to create queue
+        await Task.Delay(500); // simulate
+        _submitting = false;
+    }
+}
+
+

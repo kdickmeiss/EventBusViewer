@@ -4,10 +4,67 @@ using EventBusViewer.Client.Models;
 
 namespace EventBusViewer.Client.Services;
 
-public sealed class QueueService(
-    ServiceBusAdministrationClient adminClient,
-    ServiceBusClient serviceBusClient)
+public sealed class QueueService : IDisposable
 {
+    private readonly SettingsService _settings;
+    private ServiceBusAdministrationClient? _adminClient;
+    private ServiceBusClient? _serviceBusClient;
+    private string? _lastAdminCs;
+    private string? _lastClientCs;
+
+    public QueueService(SettingsService settings)
+    {
+        _settings = settings;
+        _settings.OnChange += InvalidateClients;
+    }
+
+    private ServiceBusAdministrationClient AdminClient
+    {
+        get
+        {
+            string cs = _settings.ServiceBus.AdministrationConnectionString;
+            if (_adminClient is null || _lastAdminCs != cs)
+            {
+                _lastAdminCs = cs;
+                _adminClient = new ServiceBusAdministrationClient(cs);
+            }
+            return _adminClient;
+        }
+    }
+
+    private ServiceBusClient BusClient
+    {
+        get
+        {
+            string cs = _settings.ServiceBus.ClientConnectionString;
+            if (_serviceBusClient is null || _lastClientCs != cs)
+            {
+                _lastClientCs = cs;
+                ServiceBusClient? old = _serviceBusClient;
+                _serviceBusClient = new ServiceBusClient(cs);
+                old?.DisposeAsync().AsTask().ContinueWith(_ => { });
+            }
+            return _serviceBusClient;
+        }
+    }
+
+    private void InvalidateClients()
+    {
+        _adminClient = null;
+        ServiceBusClient? old = _serviceBusClient;
+        _serviceBusClient = null;
+        _lastAdminCs = null;
+        _lastClientCs = null;
+        old?.DisposeAsync().AsTask().ContinueWith(_ => { });
+    }
+
+    public void Dispose()
+    {
+        _settings.OnChange -= InvalidateClients;
+        _serviceBusClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+
     /// <summary>
     /// Returns every queue with its active and dead-letter message counts (peek-based).
     /// </summary>
@@ -15,7 +72,7 @@ public sealed class QueueService(
     {
         var queues = new List<QueueInfo>();
 
-        await foreach (QueueProperties queue in adminClient.GetQueuesAsync(cancellationToken))
+        await foreach (QueueProperties queue in AdminClient.GetQueuesAsync(cancellationToken))
         {
             int active = await CountMessagesAsync(queue.Name, fromDeadLetter: false, cancellationToken);
             int deadLetter = await CountMessagesAsync(queue.Name, fromDeadLetter: true, cancellationToken);
@@ -63,9 +120,9 @@ public sealed class QueueService(
         CancellationToken cancellationToken = default)
     {
         ServiceBusReceiver receiver = fromDeadLetter
-            ? serviceBusClient.CreateReceiver(queueName,
+            ? BusClient.CreateReceiver(queueName,
                 new ServiceBusReceiverOptions { SubQueue = SubQueue.DeadLetter })
-            : serviceBusClient.CreateReceiver(queueName);
+            : BusClient.CreateReceiver(queueName);
 
         await using (receiver)
         {
@@ -78,7 +135,7 @@ public sealed class QueueService(
         string messageBody,
         CancellationToken cancellationToken = default)
     {
-        await using ServiceBusSender sender = serviceBusClient.CreateSender(queueName);
+        await using ServiceBusSender sender = BusClient.CreateSender(queueName);
 
         var message = new ServiceBusMessage(messageBody)
         {
@@ -103,22 +160,22 @@ public sealed class QueueService(
 
     public async Task<bool> QueueExistsAsync(string queueName, CancellationToken cancellationToken = default)
     {
-        Azure.Response<bool> response = await adminClient.QueueExistsAsync(queueName, cancellationToken);
+        Azure.Response<bool> response = await AdminClient.QueueExistsAsync(queueName, cancellationToken);
         return response.Value;
     }
 
     public async Task<QueueProperties> GetQueuePropertiesAsync(string queueName,
         CancellationToken cancellationToken = default)
     {
-        Azure.Response<QueueProperties> response = await adminClient.GetQueueAsync(queueName, cancellationToken);
+        Azure.Response<QueueProperties> response = await AdminClient.GetQueueAsync(queueName, cancellationToken);
         return response.Value;
     }
 
     public Task UpdateQueueAsync(QueueProperties properties, CancellationToken cancellationToken = default) =>
-        adminClient.UpdateQueueAsync(properties, cancellationToken);
+        AdminClient.UpdateQueueAsync(properties, cancellationToken);
 
     public Task DeleteQueueAsync(string queueName, CancellationToken cancellationToken = default) =>
-        adminClient.DeleteQueueAsync(queueName, cancellationToken);
+        AdminClient.DeleteQueueAsync(queueName, cancellationToken);
 
     public Task CreateQueueAsync(
         string name,
@@ -136,7 +193,7 @@ public sealed class QueueService(
             DeadLetteringOnMessageExpiration = deadLetterOnExpiration
         };
 
-        return adminClient.CreateQueueAsync(options, cancellationToken);
+        return AdminClient.CreateQueueAsync(options, cancellationToken);
     }
 }
 

@@ -1,0 +1,135 @@
+﻿@using EventBusViewer.Client.Models
+@using EventBusViewer.Client.Services
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+
+<div class="first-run-overlay">
+    <MudContainer MaxWidth="MaxWidth.Small" Class="first-run-container">
+        <MudStack Spacing="6" AlignItems="AlignItems.Center">
+
+            @* ── Logo / Header ── *@
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Hub"
+                         Color="Color.Primary"
+                         Style="font-size: 4rem;"/>
+                <MudText Typo="Typo.h4" Align="Align.Center">Welcome to EventBus Viewer</MudText>
+                <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                    Before you get started, please provide your Azure Service Bus connection strings.
+                    These will be saved locally and can be changed later on the Configuration page.
+                </MudText>
+            </MudStack>
+
+            @* ── Form ── *@
+            <MudPaper Elevation="3" Class="pa-6 rounded-lg" Style="width:100%">
+                <EditForm Model="_form" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator/>
+
+                    <MudStack Spacing="4">
+                        <MudTextField @bind-Value="_form.AdministrationConnectionString"
+                                      Label="Administration Connection String"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Used to manage queues (create, update, delete)."
+                                      Placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=..."
+                                      Lines="2"
+                                      Required="true"
+                                      RequiredError="Administration connection string is required."
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
+                                      AdornmentColor="Color.Primary"/>
+
+                        <MudTextField @bind-Value="_form.ClientConnectionString"
+                                      Label="Client Connection String"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Used to send and receive messages."
+                                      Placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=..."
+                                      Lines="2"
+                                      Required="true"
+                                      RequiredError="Client connection string is required."
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Cable"
+                                      AdornmentColor="Color.Secondary"/>
+
+                        @if (_errorMessage is not null)
+                        {
+                            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                                @_errorMessage
+                            </MudAlert>
+                        }
+
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Large"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   Disabled="_saving">
+                            @(_saving ? "Saving…" : "Save & Continue")
+                        </MudButton>
+                    </MudStack>
+                </EditForm>
+            </MudPaper>
+
+        </MudStack>
+    </MudContainer>
+</div>
+
+<style>
+    .first-run-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--mud-palette-background);
+        overflow-y: auto;
+        padding: 2rem 1rem;
+    }
+
+    .first-run-container {
+        width: 100%;
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private readonly ServiceBusSettings _form = new();
+    private bool _saving;
+    private string? _errorMessage;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.AdministrationConnectionString) ||
+            string.IsNullOrWhiteSpace(_form.ClientConnectionString))
+        {
+            _errorMessage = "Both connection strings are required.";
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            await SettingsService.SaveConnectionSettingsAsync(new ServiceBusSettings
+            {
+                AdministrationConnectionString = _form.AdministrationConnectionString.Trim(),
+                ClientConnectionString = _form.ClientConnectionString.Trim()
+            });
+
+            Snackbar.Add("Connection settings saved successfully.", Severity.Success);
+            await OnCompleted.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save settings: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
+
+

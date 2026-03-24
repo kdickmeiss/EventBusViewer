@@ -1,11 +1,12 @@
-using Azure.Messaging.ServiceBus;
-using Azure.Messaging.ServiceBus.Administration;
 using EventBusViewer.Client.Components;
 using EventBusViewer.Client.Services;
 using EventBusViewer.ServiceDefaults;
 using MudBlazor.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+// Layer user-settings.json on top of appsettings — created by SettingsService when the user saves.
+builder.Configuration.AddJsonFile("user-settings.json", optional: true, reloadOnChange: false);
 
 builder.AddServiceDefaults();
 
@@ -15,15 +16,8 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMudServices();
 
-// Azure Service Bus — emulator endpoints
-builder.Services.AddSingleton(_ =>
-    new ServiceBusAdministrationClient(
-        "Endpoint=sb://localhost:5300;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"));
-
-builder.Services.AddSingleton(_ =>
-    new ServiceBusClient(
-        "Endpoint=sb://localhost:7777;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"));
-
+// Settings are managed by SettingsService; Service Bus clients are created lazily inside QueueService.
+builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<QueueService>();
 
 WebApplication app = builder.Build();

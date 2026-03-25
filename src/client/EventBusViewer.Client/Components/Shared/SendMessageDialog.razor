@@ -2,7 +2,6 @@
 @using EventBusViewer.Client.Services
 @inject QueueService QueueService
 @inject ISnackbar Snackbar
-
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -17,7 +16,22 @@
                 Paste or type a valid JSON message body below. The message will be sent with
                 <code>ContentType: application/json</code> and a generated <code>MessageId</code>.
             </MudText>
-
+            @if (RequiresSession)
+            {
+                <MudTextField T="string"
+                              @bind-Value="_sessionId"
+                              Label="Session ID"
+                              Placeholder="my-session-id"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Immediate="true"
+                              Required="true"
+                              RequiredError="Session ID is required for session-enabled queues."
+                              Disabled="_sending"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Tag"
+                              HelperText="This queue requires sessions. Every message must carry a Session ID."/>
+            }
             <MudTextField T="string"
                           Value="@_jsonInput"
                           ValueChanged="@((string? v) => OnJsonChanged(v))"
@@ -32,7 +46,6 @@
                           Error="_validationError is not null"
                           ErrorText="@_validationError"
                           Disabled="_sending"/>
-
             @if (_formattedPreview is not null && _validationError is null)
             {
                 <MudStack Spacing="1">
@@ -56,7 +69,7 @@
             @if (_sending)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
-                <span>Sending…</span>
+                <span>Sending&#x2026;</span>
             }
             else
             {
@@ -65,36 +78,32 @@
         </MudButton>
     </DialogActions>
 </MudDialog>
-
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
-
     [Parameter, EditorRequired] public string QueueName { get; set; } = string.Empty;
-
+    /// <summary>When true a Session ID field is shown and must be filled before sending.</summary>
+    [Parameter] public bool RequiresSession { get; set; }
     private string? _jsonInput;
     private string? _formattedPreview;
     private string? _validationError;
+    private string? _sessionId;
     private bool _sending;
-
     private bool CanSend =>
         !_sending &&
         !string.IsNullOrWhiteSpace(_jsonInput) &&
-        _validationError is null;
-
+        _validationError is null &&
+        (!RequiresSession || !string.IsNullOrWhiteSpace(_sessionId));
     private void OnJsonChanged(string? value)
     {
         _jsonInput = string.IsNullOrEmpty(value) ? null : value;
         ValidateJson();
     }
-
     private void ValidateJson()
     {
         _formattedPreview = null;
         _validationError = null;
-
         if (string.IsNullOrWhiteSpace(_jsonInput))
             return;
-
         try
         {
             using var doc = JsonDocument.Parse(_jsonInput);
@@ -106,17 +115,15 @@
             _validationError = $"Invalid JSON: {ex.Message}";
         }
     }
-
     private async Task SendAsync()
     {
         ValidateJson();
         if (!CanSend || _jsonInput is null)
             return;
-
         _sending = true;
         try
         {
-            await QueueService.SendMessageAsync(QueueName, _jsonInput);
+            await QueueService.SendMessageAsync(QueueName, _jsonInput, RequiresSession ? _sessionId : null);
             Snackbar.Add($"Message sent to \"{QueueName}\".", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
@@ -129,6 +136,5 @@
             _sending = false;
         }
     }
-
     private void Cancel() => MudDialog.Cancel();
 }

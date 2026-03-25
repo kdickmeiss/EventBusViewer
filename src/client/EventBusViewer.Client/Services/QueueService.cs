@@ -77,7 +77,7 @@ public sealed class QueueService : IDisposable
             int active = await CountMessagesAsync(queue.Name, fromDeadLetter: false, cancellationToken);
             int deadLetter = await CountMessagesAsync(queue.Name, fromDeadLetter: true, cancellationToken);
 
-            queues.Add(new QueueInfo(queue.Name, active, deadLetter, queue.Status));
+            queues.Add(new QueueInfo(queue.Name, active, deadLetter, queue.Status, queue.RequiresSession));
         }
 
         return queues;
@@ -133,6 +133,7 @@ public sealed class QueueService : IDisposable
     public async Task SendMessageAsync(
         string queueName,
         string messageBody,
+        string? sessionId = null,
         CancellationToken cancellationToken = default)
     {
         await using ServiceBusSender sender = BusClient.CreateSender(queueName);
@@ -142,6 +143,9 @@ public sealed class QueueService : IDisposable
             ContentType = "application/json",
             MessageId = Guid.NewGuid().ToString()
         };
+
+        if (!string.IsNullOrWhiteSpace(sessionId))
+            message.SessionId = sessionId;
 
         await sender.SendMessageAsync(message, cancellationToken);
     }

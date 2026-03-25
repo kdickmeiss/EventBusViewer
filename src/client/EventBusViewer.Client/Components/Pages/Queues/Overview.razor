@@ -112,6 +112,7 @@
     <HeaderContent>
         <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Name)">Name</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.RequiresSession)">Session</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.DeadLetterMessages)">Dead-letter</MudTableSortLabel></MudTh>
         <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel></MudTh>
@@ -138,6 +139,24 @@
                 @context.Status.ToString()
             </MudChip>
         </MudTd>
+        <MudTd DataLabel="Session">
+            @if (context.RequiresSession)
+            {
+                <MudTooltip Text="Sessions required">
+                    <MudChip T="string"
+                             Color="Color.Tertiary"
+                             Size="Size.Small"
+                             Variant="Variant.Outlined"
+                             Icon="@Icons.Material.Filled.AccountTree">
+                        Session
+                    </MudChip>
+                </MudTooltip>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Default">—</MudText>
+            }
+        </MudTd>
         <MudTd DataLabel="Active" Style="text-align:right">
             <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
         </MudTd>
@@ -160,7 +179,7 @@
                                Size="Size.Small"
                                Color="Color.Secondary"
                                title="Send message"
-                               OnClick="@(() => OpenSendDialogAsync(context.Name))"/>
+                               OnClick="@(() => OpenSendDialogAsync(context))"/>
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -300,11 +319,12 @@
     /// <summary>
     /// Opens the send-message dialog for the given queue.
     /// </summary>
-    private async Task OpenSendDialogAsync(string queueName)
+    private async Task OpenSendDialogAsync(QueueInfo queue)
     {
         var parameters = new DialogParameters<SendMessageDialog>
         {
-            { x => x.QueueName, queueName }
+            { x => x.QueueName, queue.Name },
+            { x => x.RequiresSession, queue.RequiresSession }
         };
 
         var options = new DialogOptions
@@ -316,7 +336,7 @@
         };
 
         IDialogReference dialog = await DialogService.ShowAsync<SendMessageDialog>(
-            $"Send Message — {queueName}", parameters, options);
+            $"Send Message — {queue.Name}", parameters, options);
 
         DialogResult? result = await dialog.Result;
         if (result is { Canceled: false })

@@ -1,20 +1,43 @@
 @using System.Text.Json
 @using Azure.Messaging.ServiceBus
 @inject IDialogService DialogService
+@inject IJSRuntime Js
+@inject ISnackbar Snackbar
 
-<MudCard Elevation="1" Class="mb-3">
-    <MudCardHeader>
+<MudCard Elevation="2" Class="mb-3" Style="border-radius:10px; overflow:hidden;">
+    <MudCardHeader Class="pb-2">
         <CardHeaderAvatar>
             <MudAvatar Color="@(IsDeadLetter ? Color.Error : Color.Primary)" Size="Size.Small" Variant="Variant.Outlined">
                 <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small"/>
             </MudAvatar>
         </CardHeaderAvatar>
         <CardHeaderContent>
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudText Typo="Typo.subtitle1">#@Message.SequenceNumber</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Message.EnqueuedTime.ToString("yyyy-MM-dd HH:mm:ss zzz")</MudText>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">#@Message.SequenceNumber</MudText>
+
+                @if (!string.IsNullOrEmpty(Message.SessionId))
+                {
+                    <MudTooltip Text="@($"Session: {Message.SessionId}")">
+                        <MudChip T="string" Color="Color.Tertiary" Size="Size.Small" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.AccountTree" Style="font-family:monospace; max-width:180px; overflow:hidden; text-overflow:ellipsis;">
+                            @Message.SessionId
+                        </MudChip>
+                    </MudTooltip>
+                }
+
+                @if (Message.DeliveryCount > 1)
+                {
+                    <MudTooltip Text="@($"Delivered {Message.DeliveryCount} times — possible retry")">
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled"
+                                 Icon="@Icons.Material.Filled.Replay">
+                            ×@Message.DeliveryCount
+                        </MudChip>
+                    </MudTooltip>
+                }
             </MudStack>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-family: monospace;">@Message.MessageId</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @Message.EnqueuedTime.ToString("yyyy-MM-dd HH:mm:ss zzz")
+            </MudText>
         </CardHeaderContent>
         <CardHeaderActions>
             <MudTooltip Text="View full message">
@@ -26,65 +49,78 @@
         </CardHeaderActions>
     </MudCardHeader>
 
-    <MudCardContent Class="pt-0">
-        @* ── Key message properties — matching console app layout ── *@
-        <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
-            <tbody>
-                <tr>
-                    <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Secondary">Message ID</MudText></td>
-                    <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@Message.MessageId</MudText></td>
-                </tr>
-                <tr>
-                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Correlation ID</MudText></td>
-                    <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@(Message.CorrelationId ?? "—")</MudText></td>
-                </tr>
-                <tr>
-                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Content Type</MudText></td>
-                    <td><MudText Typo="Typo.body2">@(Message.ContentType ?? "—")</MudText></td>
-                </tr>
-                <tr>
-                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Enqueued</MudText></td>
-                    <td><MudText Typo="Typo.body2">@Message.EnqueuedTime.ToString("yyyy-MM-dd HH:mm:ss zzz")</MudText></td>
-                </tr>
-                <tr>
-                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Sequence #</MudText></td>
-                    <td><MudText Typo="Typo.body2">@Message.SequenceNumber</MudText></td>
-                </tr>
-                <tr>
-                    <td><MudText Typo="Typo.body2" Color="Color.Secondary">Delivery Count</MudText></td>
-                    <td><MudText Typo="Typo.body2">@Message.DeliveryCount</MudText></td>
-                </tr>
-            </tbody>
-        </MudSimpleTable>
+    <MudDivider/>
+
+    <MudCardContent Class="pt-3">
+
+        @* ── Identifiers ── *@
+        <MudStack Spacing="1" Class="mb-3">
+            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Fingerprint" Size="Size.Small" Color="Color.Secondary" Style="margin-top:2px;"/>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Message ID</MudText>
+                    <MudText Typo="Typo.body2" Style="font-family:monospace; word-break:break-all;">@Message.MessageId</MudText>
+                </MudStack>
+            </MudStack>
+
+            @if (!string.IsNullOrEmpty(Message.CorrelationId))
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" Color="Color.Secondary" Style="margin-top:2px;"/>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Correlation ID</MudText>
+                        <MudText Typo="Typo.body2" Style="font-family:monospace; word-break:break-all;">@Message.CorrelationId</MudText>
+                    </MudStack>
+                </MudStack>
+            }
+        </MudStack>
+
+        @* ── Meta tags ── *@
+        @if (!string.IsNullOrEmpty(Message.ContentType) || Message.DeliveryCount == 1)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+                @if (!string.IsNullOrEmpty(Message.ContentType))
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined"
+                             Icon="@Icons.Material.Filled.DataObject">
+                        @Message.ContentType
+                    </MudChip>
+                }
+                @if (Message.DeliveryCount == 1)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined"
+                             Icon="@Icons.Material.Filled.CheckCircle">
+                        Delivered ×1
+                    </MudChip>
+                }
+            </MudStack>
+        }
 
         @* ── Dead-letter details ── *@
         @if (IsDeadLetter)
         {
-            <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
-                <tbody>
-                    <tr>
-                        <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Error">DL Reason</MudText></td>
-                        <td><MudText Typo="Typo.body2">@(Message.DeadLetterReason ?? "—")</MudText></td>
-                    </tr>
-                    <tr>
-                        <td><MudText Typo="Typo.body2" Color="Color.Error">DL Description</MudText></td>
-                        <td><MudText Typo="Typo.body2">@(Message.DeadLetterErrorDescription ?? "—")</MudText></td>
-                    </tr>
-                </tbody>
-            </MudSimpleTable>
+            <MudAlert Severity="Severity.Error" Dense="true" Variant="Variant.Outlined" Class="mb-3" NoIcon="false">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Style="font-weight:600;">@(Message.DeadLetterReason ?? "Unknown reason")</MudText>
+                    @if (!string.IsNullOrEmpty(Message.DeadLetterErrorDescription))
+                    {
+                        <MudText Typo="Typo.caption">@Message.DeadLetterErrorDescription</MudText>
+                    }
+                </MudStack>
+            </MudAlert>
         }
 
         @* ── Application Properties ── *@
         @if (Message.ApplicationProperties.Count > 0)
         {
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Application Properties</MudText>
-            <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background: transparent;">
+            <MudSimpleTable Dense="true" Hover="true" Class="mb-3" Style="background:transparent;">
                 <tbody>
                     @foreach (KeyValuePair<string, object> prop in Message.ApplicationProperties)
                     {
                         <tr>
                             <td style="width:150px"><MudText Typo="Typo.body2" Color="Color.Secondary">@prop.Key</MudText></td>
-                            <td><MudText Typo="Typo.body2" Style="font-family: monospace;">@(prop.Value?.ToString() ?? "null")</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-family:monospace;">@(prop.Value?.ToString() ?? "null")</MudText></td>
                         </tr>
                     }
                 </tbody>
@@ -92,10 +128,21 @@
         }
 
         @* ── Body ── *@
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Body</MudText>
-        <MudPaper Class="pa-3" Elevation="0" Style="background: var(--mud-palette-surface); border-radius: 4px; overflow-x: auto; max-height: 200px; overflow-y: auto;">
-            <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color: var(--mud-palette-text-primary);">@FormatBody()</pre>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-1">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Body</MudText>
+            <MudSpacer/>
+            <MudTooltip Text="Copy body">
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                               Size="Size.Small"
+                               Color="Color.Default"
+                               OnClick="CopyBodyAsync"/>
+            </MudTooltip>
+        </MudStack>
+        <MudPaper Class="pa-3" Elevation="0"
+                  Style="background:var(--mud-palette-surface); border-radius:6px; overflow-x:auto; max-height:200px; overflow-y:auto; border:1px solid var(--mud-palette-divider);">
+            <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color:var(--mud-palette-text-primary);">@FormatBody()</pre>
         </MudPaper>
+
     </MudCardContent>
 </MudCard>
 
@@ -117,6 +164,19 @@
         catch
         {
             return raw;
+        }
+    }
+
+    private async Task CopyBodyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", FormatBody());
+            Snackbar.Add("Body copied to clipboard.", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Failed to copy.", Severity.Error);
         }
     }
 

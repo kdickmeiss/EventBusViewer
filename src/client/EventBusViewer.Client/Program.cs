@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EventBusViewer.Client.Components;
 using EventBusViewer.Client.Services;
 using EventBusViewer.ServiceDefaults;
@@ -31,12 +32,29 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Automatically open browser on start (only if not running in development)
+if (!app.Environment.IsDevelopment())
+{
+    string url = "http://localhost:5000"; // Change this if you configure a different port
+    try
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = url,
+            UseShellExecute = true
+        });
+    }
+    catch (Exception ex)
+    {
+        // Optionally log or handle the error
+    }
+}
 
 await app.RunAsync();

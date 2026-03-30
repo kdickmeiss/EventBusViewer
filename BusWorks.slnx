@@ -1,0 +1,23 @@
+<Solution>
+    <Folder Name="/solution Items/">
+        <File Path=".editorconfig" />
+        <File Path=".gitignore" />
+        <File Path="Directory.Build.props" />
+    </Folder>
+    <Folder Name="/src/" />
+    <Folder Name="/src/aspire/">
+        <Project Path="src\aspire\BusWorks.AppHost\BusWorks.AppHost.csproj" />
+        <Project Path="src\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
+    </Folder>
+    <Folder Name="/src/processing/">
+        <Project Path="src\processing\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
+        <Project Path="src\processing\BusWorks\BusWorks.csproj" />
+    </Folder>
+    <Folder Name="/src/viewers/">
+        <Project Path="src\viewers\BusWorks.Viewer.Console\BusWorks.Viewer.Console.csproj" />
+        <Project Path="src\viewers\BusWorks.Viewer\BusWorks.Viewer.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests\BusWorks.Tests\BusWorks.Tests.csproj" />
+    </Folder>
+</Solution>

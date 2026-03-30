@@ -1,0 +1,174 @@
+﻿@page "/configuration"
+@using BusWorks.Viewer.Models
+@using BusWorks.Viewer.Services
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+
+<PageTitle>Configuration</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Configuration</MudText>
+</MudStack>
+
+<MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+    Manage your Azure Service Bus connection strings and application preferences.
+    Changes are persisted locally to <code>user-settings.json</code>.
+</MudText>
+
+<MudGrid Spacing="6">
+
+    @* ── Service Bus Connection Strings ── *@
+    <MudItem xs="12" md="8" lg="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Hub"/>
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Service Bus Connection Strings</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Configure the endpoints for the Azure Service Bus administration and messaging clients.
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+
+            <MudCardContent>
+                <EditForm Model="_connForm" OnValidSubmit="SaveConnectionSettingsAsync">
+                    <DataAnnotationsValidator/>
+
+                    <MudStack Spacing="4">
+                        <MudTextField @bind-Value="_connForm.AdministrationConnectionString"
+                                      Label="Administration Connection String"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Used to manage queues (create, update, delete)."
+                                      Placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=..."
+                                      Lines="3"
+                                      Required="true"
+                                      RequiredError="Administration connection string is required."
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
+                                      AdornmentColor="Color.Primary"/>
+
+                        <MudTextField @bind-Value="_connForm.ClientConnectionString"
+                                      Label="Client Connection String"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Used to send and receive messages."
+                                      Placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=..."
+                                      Lines="3"
+                                      Required="true"
+                                      RequiredError="Client connection string is required."
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Cable"
+                                      AdornmentColor="Color.Secondary"/>
+
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   Disabled="_savingConn">
+                            @(_savingConn ? "Saving…" : "Save Connection Settings")
+                        </MudButton>
+                    </MudStack>
+                </EditForm>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* ── App Preferences ── *@
+    <MudItem xs="12" md="4" lg="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Palette"/>
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Appearance</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Personalise the look and feel of the application.
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+
+            <MudCardContent>
+                <MudStack Spacing="4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body1">Dark Mode</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Toggle between dark and light theme.
+                            </MudText>
+                        </MudStack>
+                        <MudTooltip Text="@(SettingsService.App.IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+                            <MudToggleIconButton Toggled="@SettingsService.App.IsDarkMode"
+                                                 ToggledChanged="ToggleDarkModeAsync"
+                                                 Icon="@Icons.Material.Filled.LightMode"
+                                                 ToggledIcon="@Icons.Material.Filled.DarkMode"
+                                                 Color="Color.Default"
+                                                 ToggledColor="Color.Primary"
+                                                 Size="Size.Large"/>
+                        </MudTooltip>
+                    </MudStack>
+
+                    <MudDivider/>
+
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@(SettingsService.App.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode)"
+                                 Color="@(SettingsService.App.IsDarkMode ? Color.Primary : Color.Warning)"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Currently using <strong>@(SettingsService.App.IsDarkMode ? "Dark" : "Light")</strong> mode
+                        </MudText>
+                    </MudStack>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+</MudGrid>
+
+@code {
+    private ServiceBusSettings _connForm = new();
+    private bool _savingConn;
+
+    protected override void OnInitialized()
+    {
+        // Pre-fill form with current settings (mask nothing — these are local dev strings)
+        _connForm = new ServiceBusSettings
+        {
+            AdministrationConnectionString = SettingsService.ServiceBus.AdministrationConnectionString,
+            ClientConnectionString = SettingsService.ServiceBus.ClientConnectionString
+        };
+    }
+
+    private async Task SaveConnectionSettingsAsync()
+    {
+        _savingConn = true;
+        try
+        {
+            await SettingsService.SaveConnectionSettingsAsync(new ServiceBusSettings
+            {
+                AdministrationConnectionString = _connForm.AdministrationConnectionString.Trim(),
+                ClientConnectionString = _connForm.ClientConnectionString.Trim()
+            });
+            Snackbar.Add("Connection settings saved.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingConn = false;
+        }
+    }
+
+    private async Task ToggleDarkModeAsync(bool isDark)
+    {
+        await SettingsService.SaveAppSettingsAsync(new AppSettings { IsDarkMode = isDark });
+    }
+}
+
+

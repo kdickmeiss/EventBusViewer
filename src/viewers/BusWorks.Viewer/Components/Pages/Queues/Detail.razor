@@ -1,0 +1,305 @@
+@page "/queues/{QueueName}"
+@using Azure.Messaging.ServiceBus
+@using BusWorks.Viewer.Models
+@using BusWorks.Viewer.Services
+@using BusWorks.Viewer.Components.Shared
+@inject QueueService QueueService
+@inject ISnackbar Snackbar
+
+<PageTitle>@QueueName — Queue Detail</PageTitle>
+
+@* ── Breadcrumb + actions ── *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0"/>
+    <MudSpacer/>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                   Color="Color.Primary"
+                   OnClick="LoadAllAsync"
+                   Disabled="_loadingDetail"
+                   title="Refresh"/>
+    <MudButton Variant="Variant.Outlined"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/queues/overview">
+        Back
+    </MudButton>
+</MudStack>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="() => _error = null">
+        @_error
+    </MudAlert>
+}
+
+@if (_loadingDetail)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+}
+
+@if (_detail is not null)
+{
+    @* ── Queue Settings Panel ── *@
+    <MudPaper Class="pa-5 mb-6" Elevation="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary"/>
+            <MudText Typo="Typo.h5">@_detail.Name</MudText>
+            <MudSpacer/>
+            <MudChip T="string"
+                     Color="@(_detail.Status == "Active" ? Color.Success : Color.Warning)"
+                     Variant="Variant.Filled"
+                     Size="Size.Small">
+                @_detail.Status
+            </MudChip>
+        </MudStack>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="4">
+                <MudField Label="Requires Session" Variant="Variant.Outlined">
+                    @FormatBool(_detail.RequiresSession)
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudField Label="Max Delivery Count" Variant="Variant.Outlined">
+                    @_detail.MaxDeliveryCount
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudField Label="Lock Duration" Variant="Variant.Outlined">
+                    @FormatDuration(_detail.LockDuration)
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudField Label="Dead-letter on Expiry" Variant="Variant.Outlined">
+                    @FormatBool(_detail.DeadLetteringOnMessageExpiration)
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudField Label="Message TTL" Variant="Variant.Outlined">
+                    @FormatDuration(_detail.DefaultMessageTimeToLive)
+                </MudField>
+            </MudItem>
+        </MudGrid>
+
+        @* ── Inline message counters ── *@
+        <MudDivider Class="my-4"/>
+        <MudStack Row="true" Spacing="6">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Success">@FormatCount(_detail.ActiveMessages)</MudText>
+            </MudStack>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
+                <MudText Typo="Typo.h6" Color="@(_detail.DeadLetterMessages > 0 ? Color.Error : Color.Default)">@FormatCount(_detail.DeadLetterMessages)</MudText>
+            </MudStack>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Info">@FormatCount(_detail.TotalMessages)</MudText>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    @* ── Messages Tabs ── *@
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="pa-0">
+        <MudTabPanel Text="@($"Active ({FormatCount(_detail.ActiveMessages)})")"
+                     Icon="@Icons.Material.Filled.Inbox">
+            <div class="pa-4">
+            @if (_loadingActive)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+            }
+            else if (_activeMessages.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Class="my-2">
+                    No active messages in this queue.
+                </MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="0">
+                    @foreach (ServiceBusReceivedMessage msg in _activeMessages)
+                    {
+                        <MessageCard Message="msg" IsDeadLetter="false"/>
+                    }
+                </MudStack>
+                @if (_activeMessages.Count >= PageSize)
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.ExpandMore"
+                               OnClick="LoadMoreActiveAsync"
+                               Disabled="_loadingActive"
+                               FullWidth="true"
+                               Class="mt-2">
+                        Load more
+                    </MudButton>
+                }
+            }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="@($"Dead-letter ({FormatCount(_detail.DeadLetterMessages)})")"
+                     Icon="@Icons.Material.Filled.ErrorOutline">
+            <div class="pa-4">
+            @if (_loadingDeadLetter)
+            {
+                <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4"/>
+            }
+            else if (_deadLetterMessages.Count == 0)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Text" Class="my-2">
+                    No dead-letter messages — looking good!
+                </MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="0">
+                    @foreach (ServiceBusReceivedMessage msg in _deadLetterMessages)
+                    {
+                        <MessageCard Message="msg" IsDeadLetter="true"/>
+                    }
+                </MudStack>
+                @if (_deadLetterMessages.Count >= PageSize)
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.ExpandMore"
+                               OnClick="LoadMoreDeadLetterAsync"
+                               Disabled="_loadingDeadLetter"
+                               FullWidth="true"
+                               Class="mt-2">
+                        Load more
+                    </MudButton>
+                }
+            }
+            </div>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private const int PageSize = 25;
+
+    [Parameter] public string QueueName { get; set; } = string.Empty;
+
+    private QueueDetail? _detail;
+    private string? _error;
+    private bool _loadingDetail;
+    private bool _loadingActive;
+    private bool _loadingDeadLetter;
+
+    private List<ServiceBusReceivedMessage> _activeMessages = [];
+    private List<ServiceBusReceivedMessage> _deadLetterMessages = [];
+    private long _activeSequenceCursor;
+    private long _deadLetterSequenceCursor;
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs =
+        [
+            new BreadcrumbItem("Queues", href: "/queues/overview", icon: Icons.Material.Filled.Queue),
+            new BreadcrumbItem(QueueName, href: null, disabled: true)
+        ];
+
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        _loadingDetail = true;
+        _error = null;
+
+        try
+        {
+            _detail = await QueueService.GetQueueDetailAsync(QueueName);
+
+            // Reset message lists and load first page of each
+            _activeMessages = [];
+            _deadLetterMessages = [];
+            _activeSequenceCursor = 0;
+            _deadLetterSequenceCursor = 0;
+
+            await Task.WhenAll(LoadActivePageAsync(), LoadDeadLetterPageAsync());
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load queue: {ex.Message}";
+            Snackbar.Add(_error, Severity.Error);
+        }
+        finally
+        {
+            _loadingDetail = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadActivePageAsync()
+    {
+        _loadingActive = true;
+        try
+        {
+            IReadOnlyList<ServiceBusReceivedMessage> page =
+                await QueueService.PeekMessagesPagedAsync(QueueName, PageSize, _activeSequenceCursor, fromDeadLetter: false);
+
+            _activeMessages.AddRange(page);
+            if (page.Count > 0)
+                _activeSequenceCursor = page[^1].SequenceNumber + 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load active messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingActive = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDeadLetterPageAsync()
+    {
+        _loadingDeadLetter = true;
+        try
+        {
+            IReadOnlyList<ServiceBusReceivedMessage> page =
+                await QueueService.PeekMessagesPagedAsync(QueueName, PageSize, _deadLetterSequenceCursor, fromDeadLetter: true);
+
+            _deadLetterMessages.AddRange(page);
+            if (page.Count > 0)
+                _deadLetterSequenceCursor = page[^1].SequenceNumber + 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load dead-letter messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingDeadLetter = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task LoadMoreActiveAsync() => LoadActivePageAsync();
+    private Task LoadMoreDeadLetterAsync() => LoadDeadLetterPageAsync();
+
+    private static string FormatBool(bool value) => value ? "Yes" : "No";
+    private static string FormatCount(int count) => count >= 250 ? "250+" : count.ToString();
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1)
+            return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
+        if (ts.TotalHours >= 1)
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        if (ts.TotalMinutes >= 1)
+            return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        return $"{ts.TotalSeconds}s";
+    }
+}
+
+
+
+
+
+

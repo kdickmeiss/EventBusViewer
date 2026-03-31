@@ -57,7 +57,8 @@ public interface IConsumer<in TMessage> where TMessage : class, IIntegrationEven
     /// so scoped services can be safely injected via the constructor.
     /// </summary>
     /// <param name="context">
-    /// Provides the deserialized message and the raw Service Bus message for metadata access.
+    /// Provides the deserialized message and broker metadata.
     /// </param>
     Task Consume(IConsumeContext<TMessage> context);
 }
+

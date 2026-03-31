@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using BusWorks.Attributes;
 
 namespace BusWorks;
@@ -57,3 +57,4 @@ public static class ServiceBusRoute
         return attr.TopicName;
     }
 }
+

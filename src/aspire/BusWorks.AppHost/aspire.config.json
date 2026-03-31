@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "EventBusViewer.AppHost.csproj"
+    "path": "BusWorks.AppHost.csproj"
   }
 }

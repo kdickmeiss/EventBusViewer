@@ -7,6 +7,10 @@
     </PropertyGroup>
     
     <ItemGroup>
+        <ProjectReference Include="..\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App"/>
         <PackageReference Include="Azure.Identity" Version="1.13.2" />
         <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />

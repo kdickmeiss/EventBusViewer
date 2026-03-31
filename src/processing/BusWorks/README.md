@@ -1,4 +1,4 @@
-# BusWorks Guide
+﻿# BusWorks Guide
 
 Comprehensive guide for publishing and consuming messages using BusWorks — a processor for Azure Service Bus messages that hosts a background service for message consumption and publishing, and is extensible for other brokers.
 
@@ -7,73 +7,152 @@ Comprehensive guide for publishing and consuming messages using BusWorks — a p
 1. [Architecture Overview](#-architecture-overview)
 2. [Publishing Messages](#-publishing-messages)
 3. [Consuming Messages](#-consuming-messages)
-4. [Generic vs Non-Generic Consumers](#-generic-vs-non-generic-consumers)
-5. [Topic Subscriptions](#-topic-subscriptions)
-6. [Sessions & FIFO Ordering](#-sessions--fifo-ordering)
-7. [Consumer Attribute Reference](#-consumer-attribute-reference)
-8. [Authentication & Connection](#-authentication--connection)
-9. [Global ServiceBus Settings](#-global-servicebus-settings)
-10. [Dependency Injection](#-dependency-injection)
-11. [OpenTelemetry Observability](#-opentelemetry-observability)
-12. [Message Processing Patterns](#-message-processing-patterns)
-13. [Error Handling Strategies](#-error-handling-strategies)
-14. [Best Practices](#-best-practices)
-15. [Troubleshooting](#-troubleshooting)
+4. [Topic Subscriptions](#-topic-subscriptions)
+5. [Sessions & FIFO Ordering](#-sessions--fifo-ordering)
+6. [Consumer Attribute Reference](#-consumer-attribute-reference)
+7. [Authentication & Connection](#-authentication--connection)
+8. [Global ServiceBus Settings](#-global-servicebus-settings)
+9. [Dependency Injection](#-dependency-injection)
+10. [OpenTelemetry Observability](#-opentelemetry-observability)
+11. [Message Processing Patterns](#-message-processing-patterns)
+12. [Error Handling Strategies](#-error-handling-strategies)
+13. [Best Practices](#-best-practices)
+14. [Troubleshooting](#-troubleshooting)
 
 ---
 
 ## 🏗️ Architecture Overview
 
-BusWorks follows Clean Architecture — the interface lives in the Application layer, the implementation lives in the Infrastructure layer.
+BusWorks follows Clean Architecture — the contracts live in `BusWorks.Abstractions` (Application layer), the implementation lives in `BusWorks` (Infrastructure layer). Consumer classes belong in the Application layer and have **zero** Azure SDK dependencies.
 
 ```
-BusWorks.Abstractions/
-    IEventBusPublisher.cs         ← publisher abstraction (application layer)
-    IIntegrationEvent.cs          ← base interface for all events
-    IntegrationEvent.cs           ← base record for all events
-    ISessionedEvent.cs            ← sessioned event interface
-    ServiceBusRoute.cs            ← Route helper (tests / provisioning tools)
-    ServiceBusRouteAttributes.cs  ← [QueueRoute] / [TopicRoute] attributes for events
-
-BusWorks/
+BusWorks.Abstractions/              ← framework contracts — zero NuGet dependencies
+    IEventBusPublisher.cs
+    IIntegrationEvent.cs
+    IntegrationEvent.cs
+    ISessionedEvent.cs
+    ServiceBusRoute.cs
     Attributes/
-        ServiceBusQueueAttribute.cs
-        ServiceBusTopicAttribute.cs
-    BackgroundServices/
-        ServiceBusProcessorBackgroundService.cs  ← consumer background service
+        ServiceBusRouteAttributes.cs  ← [QueueRoute] / [TopicRoute]
+        ServiceBusQueueAttribute.cs   ← [ServiceBusQueue]
+        ServiceBusTopicAttribute.cs   ← [ServiceBusTopic]
     Consumer/
-        ServiceBusConsumer.cs                    ← consumer base class
-        ExampleServiceBusConsumer.cs             ← example consumer
+        IConsumer.cs                  ← IConsumer<T> + IConsumeContext<T>
+        MessageContext.cs             ← broker-agnostic message metadata
+
+BusWorks/                           ← Infrastructure layer — Azure SDK, DI wiring
+    BackgroundServices/
+        ServiceBusProcessorBackgroundService.cs
+    Consumer/
+        ConsumeContext.cs
     Options/
-        EvenBusOptions.cs                        ← options model
+        EventBusOptions.cs
     Publisher/
-        ServiceBusPublisher.cs                   ← IEventPublisher implementation
+        ServiceBusPublisher.cs
     DependencyInjection.cs
     ServiceBusAssemblyRegistry.cs
 ```
 
-### Why split across layers?
-
-The Application layer defines **what** (publish a message and where it goes). The Infrastructure layer defines **how** (use Azure Service Bus or other brokers). Controllers and handlers depend only on `IEventPublisher` — they never know the broker implementation exists.
+The above is the **framework**. In your own solution the recommended project layout is:
 
 ```
-Integration Event
-  → [QueueRoute("my-queue")]        (Application layer — declares destination)
+MyService.IntegrationEvents/        ← shared contracts classlib
+    ↳ references: BusWorks.Abstractions only
+    OrderCreatedEvent.cs            ← [QueueRoute("orders")] record
+    PaymentProcessedEvent.cs        ← [QueueRoute("payments")] record
+    ...
 
+MyService.Application/              ← Application layer
+    ↳ references: BusWorks.Abstractions, MyService.IntegrationEvents
+    Consumers/
+        OrderCreatedConsumer.cs     ← implements IConsumer<OrderCreatedEvent>
+    ...
+
+MyService.Infrastructure/           ← Infrastructure / startup
+    ↳ references: BusWorks, MyService.Application, MyService.IntegrationEvents
+    Program.cs                      ← services.AddEventBus(..., typeof(OrderCreatedConsumer).Assembly)
+```
+
+### Why split across layers?
+
+The Application layer defines **what** (consumer logic, publishing contract). The Infrastructure layer defines **how** (Azure Service Bus, DI wiring). Integration events live in their own classlib so **any service** can reference the shared contracts without pulling in consumers or infrastructure.
+
+#### Integration Events — separate classlib
+
+Integration events are **shared contracts between services**. Putting them in a dedicated `*.IntegrationEvents` project means:
+
+- A **sender service** references `MyService.IntegrationEvents` to publish the event
+- A **consumer service** references `MyService.IntegrationEvents` to receive it
+- Neither needs to reference the other service's application or infrastructure code
+- The classlib only depends on `BusWorks.Abstractions` — no Azure SDK, no business logic
+
+```
+OrderService.IntegrationEvents      ← published as NuGet or referenced directly
+    [QueueRoute("orders")]
+    record OrderCreatedEvent        ← both services share this type
+         ↓                                   ↓
+  OrderService (publishes)          NotificationService (consumes)
+  IEventBusPublisher.PublishAsync   IConsumer<OrderCreatedEvent>
+```
+
+#### The concrete consumer class lives in the Application layer
+
+This surprises people at first, but it follows the same logic as MediatR: an `IRequestHandler<T>` lives in Application, not Infrastructure, because it contains use-case logic. The same applies here.
+
+The key reason it stays in Application: **a consumer class has zero Azure SDK dependency**. The `[ServiceBusQueue]` attribute comes from `BusWorks.Abstractions` (no NuGet packages). `IConsumeContext<T>` exposes a broker-agnostic `MessageContext`. The consumer never touches Azure.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ MyService.IntegrationEvents  (shared contracts classlib)               │
+│                                                                        │
+│  [QueueRoute("orders")]                                                │
+│  record OrderCreatedEvent : IntegrationEvent                           │
+└────────────────────────────────────────────────────────────────────────┘
+          ↑ referenced by both sender and consumer services
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ MyService.Application  (Application layer)                             │
+│                                                                        │
+│  [ServiceBusQueue]                   ← routing declaration only        │
+│  class OrderCreatedConsumer          ← use-case logic lives here       │
+│      : IConsumer<OrderCreatedEvent>                                    │
+│  {                                                                     │
+│      // zero Azure SDK — context.Metadata is broker-agnostic          │
+│      public Task Consume(IConsumeContext<OrderCreatedEvent> context)   │
+│  }                                                                     │
+│                                                                        │
+│  IEventBusPublisher                  ← publishing contract             │
+└────────────────────────────────────────────────────────────────────────┘
+                    ↑ discovers IConsumer<T> classes
+                    ↑ implements IEventBusPublisher
+┌────────────────────────────────────────────────────────────────────────┐
+│ Infrastructure  (BusWorks)                                             │
+│                                                                        │
+│  ServiceBusProcessorBackgroundService  ← wires consumers to Azure     │
+│  ServiceBusPublisher                   ← publishes via Azure SDK      │
+│  DependencyInjection / AddEventBus()                                   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+The `[ServiceBusQueue]` attribute is a **routing declaration** — exactly like `[HttpGet("route")]` on a controller action. Nobody puts a controller in the Infrastructure layer just because it has an HTTP routing attribute. The same principle applies here.
+
+**Publishing follows the same pattern:**
+
+```
 Controller / Handler
-  → IEventPublisher.PublishAsync (Application layer — concept)
+  → IEventBusPublisher.PublishAsync   (Application — contract)
        ↑ implemented by
-  ServiceBusPublisher                (Infrastructure layer — Azure SDK, reads [QueueRoute])
+  ServiceBusPublisher                  (Infrastructure — Azure SDK, reads [QueueRoute])
 ```
 
 ### Route attributes — single source of truth
 
-The queue or topic name for an integration event is declared **once** on the event record itself via `[QueueRoute]` or `[TopicRoute]` (both live in the Application layer). Both the publisher and the consumer infrastructure read from this attribute automatically, so the name never needs to be repeated anywhere else.
+The queue or topic name for an integration event is declared **once** on the event record itself via `[QueueRoute]` or `[TopicRoute]`. Both the publisher and the consumer infrastructure read from this attribute automatically.
 
 ```
 [QueueRoute("resort-created")]   ← defined once, on the event
        ↓                                ↓
-IEventPublisher.PublishAsync  [ServiceBusQueue] consumer
+IEventBusPublisher.PublishAsync  [ServiceBusQueue] consumer
 (reads it automatically)         (reads it automatically)
 ```
 
@@ -83,10 +162,21 @@ IEventPublisher.PublishAsync  [ServiceBusQueue] consumer
 
 ### 1. Define Your Integration Event
 
-Inherit from `IntegrationEvent` and annotate with `[QueueRoute]` (or `[TopicRoute]` for topics):
+Create a dedicated `*.IntegrationEvents` classlib that references only `BusWorks.Abstractions`. This keeps the event contracts completely independent — other services can reference this project (or its NuGet package) to publish or subscribe to the same events without depending on your application or infrastructure code.
+
+```xml
+<!-- MyService.IntegrationEvents.csproj -->
+<ItemGroup>
+    <ProjectReference Include="..\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
+</ItemGroup>
+```
+
+Then define your events:
 
 ```csharp
-using BusWorks.Abstractions;
+// MyService.IntegrationEvents / UserCreatedIntegrationEvent.cs
+using BusWorks;
+using BusWorks.Attributes;
 
 [QueueRoute("user-created-events")]
 public sealed record UserCreatedIntegrationEvent(
@@ -102,9 +192,9 @@ The `[QueueRoute]` attribute is the **single source of truth** for the queue nam
 ### 2. Inject and Publish in a Command Handler
 
 ```csharp
-using BusWorks.Abstractions;
+using BusWorks;
 
-public class RegisterUserCommandHandler(IEventPublisher eventBus) : ICommandHandler<RegisterUserCommand>
+public class RegisterUserCommandHandler(IEventBusPublisher eventBus) : ICommandHandler<RegisterUserCommand>
 {
     public async ValueTask<ErrorOr<Success>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
@@ -127,7 +217,7 @@ No queue name string anywhere — the publisher resolves it from `[QueueRoute]` 
 private static async Task<IResult> CreateUserAsync(
     [FromBody] CreateUserRequest request,
     [FromServices] ISender sender,
-    [FromServices] IEventPublisher eventBus,
+    [FromServices] IEventBusPublisher eventBus,
     CancellationToken cancellationToken)
 {
     ErrorOr<UserResponse> result = await sender.Send(new CreateUserCommand(request.Email), cancellationToken);
@@ -143,12 +233,12 @@ private static async Task<IResult> CreateUserAsync(
 }
 ```
 
-### IEventPublisher Interface
+### IEventBusPublisher Interface
 
 Defined in `BusWorks.Abstractions`:
 
 ```csharp
-public interface IEventPublisher
+public interface IEventBusPublisher
 {
     /// Publishes the event to the destination declared by [QueueRoute] or [TopicRoute] on TEvent.
     Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
@@ -165,7 +255,7 @@ public interface IEventPublisher
 - ✅ Creates a `SpanKind.Producer` OpenTelemetry span with full semantic conventions
 - ✅ Records exceptions and sets error span status on failure
 
-You never interact with `ServiceBusPublisher` directly — always inject `IEventPublisher`.
+You never interact with `ServiceBusPublisher` directly — always inject `IEventBusPublisher`.
 
 ---
 
@@ -173,52 +263,60 @@ You never interact with `ServiceBusPublisher` directly — always inject `IEvent
 
 ### Quick Start
 
-Decorate the consumer with `[ServiceBusQueue]` — **no queue name needed** because it is resolved automatically from `[QueueRoute]` on the message type:
+Implement `IConsumer<TMessage>`, inject your dependencies via the constructor, and decorate with `[ServiceBusQueue]`. The queue name is resolved automatically from `[QueueRoute]` on the message type:
 
 ```csharp
-using BusWorks.Abstractions;
+using BusWorks.Attributes;
 using BusWorks.Consumer;
 
 // Queue name comes from [QueueRoute("user-created-events")] on UserCreatedIntegrationEvent
 [ServiceBusQueue]
-public class UserCreatedConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent>
+public class UserCreatedConsumer(IEmailService emailService) : IConsumer<UserCreatedIntegrationEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        UserCreatedIntegrationEvent message,        // Already deserialized! ✨
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<UserCreatedIntegrationEvent> context)
     {
-        await SendWelcomeEmail(message.Email);
+        UserCreatedIntegrationEvent msg = context.Message; // already deserialized ✨
+        await emailService.SendWelcomeEmailAsync(msg.Email, context.CancellationToken);
     }
-
-    private Task SendWelcomeEmail(string email) => Task.CompletedTask;
 }
 ```
 
-Consumers are **automatically discovered** at startup — no DI registration needed.
+Consumers are **automatically discovered** at startup — no manual DI registration needed.
 
 > 💡 **Note:** OpenTelemetry tracing is automatic! No infrastructure logging needed (message IDs, delivery counts, etc.). Only log business-critical events.
 
-### With an Explicit Override
+### IConsumeContext\<T\>
 
-You can still pass a name directly to `[ServiceBusQueue]` when you need to override or the message type has no `[QueueRoute]` attribute:
+The `context` parameter gives you everything you need inside a consumer:
+
+| Property | Type | Description |
+|---|---|---|
+| `context.Message` | `TMessage` | The deserialized integration event |
+| `context.Metadata` | `MessageContext` | Broker metadata — `MessageId`, `SessionId`, `CorrelationId`, `DeliveryCount`, `SequenceNumber`, `EnqueuedTime`, `ContentType`, `Subject`, `ApplicationProperties` |
+| `context.CancellationToken` | `CancellationToken` | Cancellation token for the processing operation |
+
+`MessageContext` is entirely broker-agnostic — no Azure SDK type on your consumer's surface.
+
+### With an Explicit Name Override
+
+Pass a name directly when you need to override, or when the message type has no `[QueueRoute]` attribute:
 
 ```csharp
 [ServiceBusQueue("user-created-events")]
-public class UserCreatedConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent>
+public class UserCreatedConsumer : IConsumer<UserCreatedIntegrationEvent>
 {
     // ...
 }
 ```
 
-The explicit name takes precedence over the route attribute. This is useful for non-generic consumers or edge cases where the event is owned by another module.
+The explicit name takes precedence over the route attribute.
 
-### Using RouteHelper in Tests and Tools
+### Using ServiceBusRoute in Tests and Tools
 
-When you need the queue name outside of a consumer (e.g. DLQ assertions in tests, provisioning scripts), use the `RouteHelper` — it reads from the same `[QueueRoute]` attribute:
+When you need the queue name outside of a consumer (e.g. DLQ assertions in tests, provisioning scripts), use `ServiceBusRoute` — it reads from the same `[QueueRoute]` attribute:
 
 ```csharp
-string queue = RouteHelper.GetQueueName<UserCreatedIntegrationEvent>();
+string queue = ServiceBusRoute.GetQueueName<UserCreatedIntegrationEvent>();
 
 // In an integration test:
 IReadOnlyList<ServiceBusReceivedMessage> dlqMessages =
@@ -226,55 +324,6 @@ IReadOnlyList<ServiceBusReceivedMessage> dlqMessages =
 ```
 
 This keeps everything in sync — rename the queue in one place (`[QueueRoute]`) and it automatically propagates to publishers, consumers, tests, and tools.
-
----
-
-## 🎯 Generic vs Non-Generic Consumers
-
-### ServiceBusConsumer\<TMessage\> (Generic — RECOMMENDED) ✅
-
-**Use when:**
-- Processing JSON messages
-- You want automatic deserialization
-- You prefer strongly-typed message objects
-
-```csharp
-// Queue name resolved automatically from [QueueRoute] on MyEvent
-[ServiceBusQueue]
-public class MyConsumer : ServiceBusConsumer<MyEvent>
-{
-    protected override async Task ProcessMessageAsync(
-        MyEvent message,                            // Already deserialized! ✨
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
-    {
-        Console.WriteLine($"Event: {message.Id}");
-    }
-}
-```
-
-### ServiceBusConsumer (Non-Generic)
-
-**Use when:**
-- You need full control over deserialization
-- Processing binary / non-JSON messages
-- Handling multiple message formats in one consumer
-
-> ⚠️ Non-generic consumers have no message type to read `[QueueRoute]` from. You must pass the queue name explicitly: `[ServiceBusQueue("raw-queue")]`.
-
-```csharp
-[ServiceBusQueue("raw-queue")]
-public class RawMessageConsumer : ServiceBusConsumer
-{
-    protected override async Task ProcessMessageAsync(
-        ServiceBusReceivedMessage message,
-        CancellationToken cancellationToken)
-    {
-        string body = message.Body.ToString();
-        // Custom deserialization or raw processing...
-    }
-}
-```
 
 ---
 
@@ -292,27 +341,23 @@ public sealed record UserCreatedIntegrationEvent(...) : IntegrationEvent(...);
 
 // Email Service — subscription name is this consumer's concern
 [ServiceBusTopic("email-service-subscription")]
-public class UserEventsEmailConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent>
+public class UserEventsEmailConsumer(IEmailService emailService)
+    : IConsumer<UserCreatedIntegrationEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        UserCreatedIntegrationEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<UserCreatedIntegrationEvent> context)
     {
-        await SendWelcomeEmail(message.Email);
+        await emailService.SendWelcomeEmailAsync(context.Message.Email, context.CancellationToken);
     }
 }
 
 // Notification Service — subscribes to the SAME topic, different subscription
 [ServiceBusTopic("notification-service-subscription")]
-public class UserEventsNotificationConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent>
+public class UserEventsNotificationConsumer(INotificationService notificationService)
+    : IConsumer<UserCreatedIntegrationEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        UserCreatedIntegrationEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<UserCreatedIntegrationEvent> context)
     {
-        await CreateNotification(message);
+        await notificationService.CreateAsync(context.Message, context.CancellationToken);
     }
 }
 ```
@@ -320,8 +365,6 @@ public class UserEventsNotificationConsumer : ServiceBusConsumer<UserCreatedInte
 One message published to the topic is delivered to **all subscriptions**. The topic name never appears more than once — on the event record.
 
 ### Subscription Name Constants (Optional)
-
-The topic name lives on the event. You only need constants for subscription names if they are shared between multiple places (e.g. provisioning + consumer):
 
 ```csharp
 public static class SubscriptionNames
@@ -331,10 +374,10 @@ public static class SubscriptionNames
 }
 
 [ServiceBusTopic(SubscriptionNames.EmailService)]
-public class UserEventsEmailConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent> { }
+public class UserEventsEmailConsumer : IConsumer<UserCreatedIntegrationEvent> { ... }
 
 [ServiceBusTopic(SubscriptionNames.NotificationService)]
-public class UserEventsNotificationConsumer : ServiceBusConsumer<UserCreatedIntegrationEvent> { }
+public class UserEventsNotificationConsumer : IConsumer<UserCreatedIntegrationEvent> { ... }
 ```
 
 ---
@@ -370,38 +413,32 @@ public sealed record PaymentCommand(Guid Id, DateTime OccurredOnUtc, string Cust
 }
 ```
 
-The publisher reads `ISessionedEvent.SessionId` automatically and sets it on the outgoing `ServiceBusMessage` — no changes needed at the call site of `IEventPublisher.PublishAsync`.
+The publisher reads `ISessionedEvent.SessionId` automatically and sets it on the outgoing `ServiceBusMessage` — no changes needed at the call site of `IEventBusPublisher.PublishAsync`.
 
 ### Step 2 — Add `RequireSession = true` to the Consumer
 
 ```csharp
 // Queue session consumer
 [ServiceBusQueue(RequireSession = true)]
-public class PaymentCommandConsumer : ServiceBusConsumer<PaymentCommand>
+public class PaymentCommandConsumer : IConsumer<PaymentCommand>
 {
-    protected override async Task ProcessMessageAsync(
-        PaymentCommand message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<PaymentCommand> context)
     {
         // All messages for the same CustomerId arrive here in strict order.
         // Messages for different CustomerIds are processed concurrently.
-        string customerId = originalMessage.SessionId;
-        await ProcessPaymentInOrder(customerId, message, cancellationToken);
+        string customerId = context.Metadata.SessionId!;
+        await ProcessPaymentInOrder(customerId, context.Message, context.CancellationToken);
     }
 }
 
 // Topic subscription session consumer — identical, just a different attribute
 [ServiceBusTopic("fulfillment-subscription", RequireSession = true)]
-public class OrderFulfillmentConsumer : ServiceBusConsumer<OrderPlacedEvent>
+public class OrderFulfillmentConsumer : IConsumer<OrderPlacedEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        OrderPlacedEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<OrderPlacedEvent> context)
     {
-        string orderId = originalMessage.SessionId;
-        await FulfillOrder(orderId, message, cancellationToken);
+        string orderId = context.Metadata.SessionId!;
+        await FulfillOrder(orderId, context.Message, context.CancellationToken);
     }
 }
 ```
@@ -475,9 +512,9 @@ The `SessionId` is the **aggregate root ID** for messages that must be ordered r
 
 ### Future Extension — Saga / Workflow State
 
-Azure Service Bus sessions optionally support **per-session state** (up to 256 KB of arbitrary bytes per session). This enables stateful saga/workflow patterns where a consumer can persist and resume partial progress across messages in the same session — for example, tracking which steps of an order saga have been completed.
+Azure Service Bus sessions optionally support **per-session state** (up to 256 KB of arbitrary bytes per session). This enables stateful saga/workflow patterns where a consumer can persist and resume partial progress across messages in the same session.
 
-**This is not implemented yet** — it was deliberately left out because no use case requires it today. When needed, it can be added as a purely additive change (a new scoped `ISessionContext` service injected via DI) with **zero changes** to the current `IServiceBusConsumer`, `ServiceBusConsumer<T>`, or any existing consumer.
+**This is not implemented yet** — it was deliberately left out because no use case requires it today. When needed, it can be added as a purely additive change (a new scoped `ISessionContext` service injected via DI) with **zero changes** to `IConsumer<T>` or any existing consumer.
 
 The rough extension point:
 
@@ -492,23 +529,20 @@ public interface ISessionContext
 
 // Saga consumer — injects ISessionContext like any other service
 [ServiceBusQueue("order-saga-commands", RequireSession = true)]
-public class OrderSagaConsumer(ISessionContext sessionContext) : ServiceBusConsumer<OrderSagaCommand>
+public class OrderSagaConsumer(ISessionContext sessionContext) : IConsumer<OrderSagaCommand>
 {
-    protected override async Task ProcessMessageAsync(
-        OrderSagaCommand message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<OrderSagaCommand> context)
     {
-        BinaryData? raw = await sessionContext.GetStateAsync(cancellationToken);
+        BinaryData? raw = await sessionContext.GetStateAsync(context.CancellationToken);
         OrderSagaState state = raw is not null
             ? JsonSerializer.Deserialize<OrderSagaState>(raw)!
             : new OrderSagaState();
 
-        state.Apply(message);
+        state.Apply(context.Message);
 
         await sessionContext.SetStateAsync(
             new BinaryData(JsonSerializer.SerializeToUtf8Bytes(state)),
-            cancellationToken);
+            context.CancellationToken);
     }
 }
 ```
@@ -580,7 +614,7 @@ Azure entity MaxDeliveryCount = 100  ← provisioned once, never changes per con
 
 ### How Dead-Lettering Works
 
-On every failed attempt the framework checks `message.DeliveryCount` against `MaxDeliveryCount`:
+On every failed attempt the framework checks `context.Metadata.DeliveryCount` against `MaxDeliveryCount`:
 
 ```
 Attempt 1 fails → DeliveryCount (1) < MaxDeliveryCount → Abandon  → re-queued
@@ -593,27 +627,27 @@ Attempt N fails → DeliveryCount (N) >= MaxDeliveryCount → Dead-letter ✅
 ```csharp
 // Minimal — queue name from [QueueRoute] on PaymentEvent, default MaxDeliveryCount of 5
 [ServiceBusQueue]
-public class PaymentConsumer : ServiceBusConsumer<PaymentEvent> { ... }
+public class PaymentConsumer : IConsumer<PaymentEvent> { ... }
 
 // Override retry limit — dead-letter after 3 failed attempts
 [ServiceBusQueue(MaxDeliveryCount = 3)]
-public class PaymentConsumer : ServiceBusConsumer<PaymentEvent> { ... }
+public class PaymentConsumer : IConsumer<PaymentEvent> { ... }
 
 // Disable code-level enforcement — rely entirely on the Azure entity's MaxDeliveryCount
 [ServiceBusQueue(MaxDeliveryCount = 0)]
-public class PaymentConsumer : ServiceBusConsumer<PaymentEvent> { ... }
+public class PaymentConsumer : IConsumer<PaymentEvent> { ... }
 
 // Session-aware with custom retry limit
 [ServiceBusQueue(RequireSession = true, MaxDeliveryCount = 5)]
-public class OrderedPaymentConsumer : ServiceBusConsumer<PaymentCommand> { ... }
+public class OrderedPaymentConsumer : IConsumer<PaymentCommand> { ... }
 
 // Topic subscription — topic name from [TopicRoute] on OrderPlacedEvent
 [ServiceBusTopic("payments-subscription", MaxDeliveryCount = 3)]
-public class OrderPaymentConsumer : ServiceBusConsumer<OrderPlacedEvent> { ... }
+public class OrderPaymentConsumer : IConsumer<OrderPlacedEvent> { ... }
 
 // Explicit queue name override (e.g. consuming an event owned by another module)
 [ServiceBusQueue("legacy-payment-queue", MaxDeliveryCount = 3)]
-public class LegacyPaymentConsumer : ServiceBusConsumer<PaymentEvent> { ... }
+public class LegacyPaymentConsumer : IConsumer<PaymentEvent> { ... }
 ```
 
 ---
@@ -621,7 +655,7 @@ public class LegacyPaymentConsumer : ServiceBusConsumer<PaymentEvent> { ... }
 ## 🔑 Authentication & Connection
 
 The `ServiceBusClient` is created automatically from the `EventBusOptions` section in `appsettings.json`.  
-Three authentication strategies are supported — choose the one that matches your environment.
+Four authentication strategies are supported — choose the one that matches your environment.
 
 ### Option A — Connection String *(Development / CI)*
 
@@ -692,7 +726,6 @@ Uses an [Azure Managed Identity](https://learn.microsoft.com/azure/active-direct
 
 #### Local Development with Managed Identity (User Account)
 
-
 For local development, you have two supported options:
 
 **A. Use a Service Bus Connection String (Recommended for Local):**
@@ -721,17 +754,8 @@ For local development, you have two supported options:
 }
 ```
 
-- `FullyQualifiedNamespace` is required (e.g., `my-namespace.servicebus.windows.net`, no `https://`).
 - Omit `ClientId` for local user authentication.
-
-**How it works:**
-- The Azure SDK uses your local developer credentials (from `az login`, Visual Studio, or Azure CLI) when no `ClientId` is specified.
-- Your Azure user account must have the appropriate Azure RBAC role (e.g., Azure Service Bus Data Sender/Receiver) on the Service Bus resource.
-
-**Steps:**
-1. Log in to Azure locally using `az login` or ensure you are signed in with Visual Studio.
-2. Ensure your user has the correct RBAC role assigned in the Azure Portal.
-3. Run your application with the above configuration.
+- Your Azure user account must have the appropriate Azure RBAC role on the Service Bus resource.
 
 ---
 
@@ -760,7 +784,7 @@ Suitable for CI pipelines, on-premises deployments, or any environment that cann
 
 ### Option D — Azure CLI *(Local Development — recommended)*
 
-Uses the Azure CLI's logged-in user for authentication. This is intended for local development and testing only.
+Uses the Azure CLI's logged-in user for authentication.
 
 ```json
 {
@@ -773,14 +797,6 @@ Uses the Azure CLI's logged-in user for authentication. This is intended for loc
 }
 ```
 
-- `FullyQualifiedNamespace` is required (e.g., `my-namespace.servicebus.windows.net`, no `https://`).
-- The Azure CLI must be installed and you must be logged in via `az login`.
-- Your Azure user account must have the appropriate Azure RBAC role (e.g., Azure Service Bus Data Sender/Receiver) on the Service Bus resource.
-
-**How it works:**
-- The Azure SDK uses your Azure CLI credentials for authentication.
-- This is the simplest and most secure way to develop locally without storing secrets or configuring managed identity on your machine.
-
 **Steps:**
 1. Install the Azure CLI and log in using `az login`.
 2. Ensure your user has the correct RBAC role assigned in the Azure Portal.
@@ -789,8 +805,6 @@ Uses the Azure CLI's logged-in user for authentication. This is intended for loc
 ---
 
 ### Processor Tuning (all auth types)
-
-These optional settings control concurrency and can be added to any configuration:
 
 ```json
 {
@@ -809,40 +823,22 @@ These optional settings control concurrency and can be added to any configuratio
 | `MaxConcurrentSessions` | `8` | Max concurrent sessions (session-aware processors) |
 | `MaxConcurrentCallsPerSession` | `1` | Max concurrent calls per session |
 
-**Environment-specific tuning:**
-
-appsettings.Development.json:
-```json
-{
-  "EventBusOptions": { "MaxConcurrentCalls": 5 }
-}
-```
-
-appsettings.Production.json:
-```json
-{
-  "EventBusOptions": { "MaxConcurrentCalls": 20 }
-}
-```
-
 ---
 
 ### Options Model
-
-The full C# model that the configuration binds to:
 
 ```csharp
 public sealed class EventBusOptions
 {
     public EventBusAuthenticationType AuthenticationType { get; set; }
 
-    public ConnectionStringOptions?      ConnectionString      { get; set; }
-    public ManagedIdentityOptions?       ManagedIdentity       { get; set; }
+    public ConnectionStringOptions?        ConnectionString        { get; set; }
+    public ManagedIdentityOptions?         ManagedIdentity         { get; set; }
     public ApplicationRegistrationOptions? ApplicationRegistration { get; set; }
-    public AzureCliOptions?              AzureCli              { get; set; }
+    public AzureCliOptions?                AzureCli                { get; set; }
 
-    public int MaxConcurrentCalls          { get; set; } = 10;
-    public int MaxConcurrentSessions       { get; set; } = 8;
+    public int MaxConcurrentCalls           { get; set; } = 10;
+    public int MaxConcurrentSessions        { get; set; } = 8;
     public int MaxConcurrentCallsPerSession { get; set; } = 1;
 }
 
@@ -852,11 +848,6 @@ public enum EventBusAuthenticationType
     ManagedIdentity,         // system- or user-assigned MI
     ApplicationRegistration, // Azure AD client-credentials
     AzureCli                 // Azure CLI user (local development)
-}
-
-public sealed class AzureCliOptions
-{
-    public string FullyQualifiedNamespace { get; set; } = string.Empty;
 }
 ```
 
@@ -869,16 +860,6 @@ If the wrong sub-section is missing (e.g. `AuthenticationType = ManagedIdentity`
 > Processor concurrency settings have been consolidated into `EventBusOptions`.  
 > See [Authentication & Connection → Processor Tuning](#processor-tuning-all-auth-types) for the full reference.
 
-```json
-{
-  "EventBusOptions": {
-    "MaxConcurrentCalls": 10,
-    "MaxConcurrentSessions": 8,
-    "MaxConcurrentCallsPerSession": 1
-  }
-}
-```
-
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `MaxConcurrentCalls` | `10` | Max concurrent message processing operations |
@@ -889,27 +870,29 @@ If the wrong sub-section is missing (e.g. `AuthenticationType = ManagedIdentity`
 
 ## 💉 Dependency Injection
 
-
 ### Registration
 
-All required services are registered via the `AddEventBus` extension method. This method configures the Service Bus client, publisher, consumer background service, and auto-discovers all consumers via reflection.
+All required services are registered via the `AddEventBus` extension method. Pass the assemblies that contain your consumer classes:
 
 ```csharp
-// In your service startup (e.g., Program.cs or Startup.cs):
-services.AddEventBus(Configuration, typeof(MyConsumer).Assembly /*, other assemblies with consumers */);
+// In Program.cs or Startup.cs:
+services.AddEventBus(
+    configuration,
+    typeof(UserCreatedConsumer).Assembly,   // application / consumer assembly
+    typeof(OrderConsumer).Assembly          // additional assemblies as needed
+);
 ```
 
 This single call:
-- Registers the Azure Service Bus client and publisher
+- Creates and registers the Azure Service Bus client
+- Registers `IEventBusPublisher` → `ServiceBusPublisher`
+- Registers `ServiceBusAssemblyRegistry` (scans provided assemblies once at startup)
+- **Registers every discovered `IConsumer<T>` as `Scoped`** — no manual registration needed
 - Registers the background processor service
-- Registers the consumer assembly registry
-- **Auto-discovers all consumers** via reflection—no manual registration is required
-
-> **Note:** The previous reference to `AddInfrastructureCommonServices` is obsolete. Use `AddEventBus` for all event bus service registrations.
 
 ### Consumer Scope Lifecycle
 
-Each message gets its **own DI scope**. Scoped services are safe to inject:
+Each message gets its **own DI scope**. Because consumers are registered as `Scoped`, all scoped services are safe to inject via the constructor:
 
 ```csharp
 [ServiceBusQueue]
@@ -917,19 +900,18 @@ public class MyConsumer(
     ApplicationDbContext dbContext,     // ✅ scoped — safe
     ISender sender,                     // ✅ scoped — safe
     IMyService myService                // ✅ transient/scoped — safe
-) : ServiceBusConsumer<MyEvent>
+) : IConsumer<MyEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        MyEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<MyEvent> context)
     {
-        await myService.DoSomethingAsync(message.Id, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await myService.DoSomethingAsync(context.Message.Id, context.CancellationToken);
+        await dbContext.SaveChangesAsync(context.CancellationToken);
         // scope + all services disposed automatically after this returns
     }
 }
 ```
+
+> **Startup validation:** because consumers are registered in the DI container as `Scoped`, bad constructor dependencies are caught immediately when the application starts — not on the first message.
 
 ---
 
@@ -941,7 +923,7 @@ All publish and consume operations are **automatically traced** with no extra co
 
 | Span Name | Kind | When |
 |-----------|------|------|
-| `ServiceBus:Publish {queue}` | `Producer` | Every `IEventPublisher.PublishAsync` call |
+| `ServiceBus:Publish {queue}` | `Producer` | Every `IEventBusPublisher.PublishAsync` call |
 | `ServiceBus:Startup` | — | Application startup |
 | `ServiceBus:Setup:{ConsumerType}` | — | Per consumer at startup |
 | `ServiceBus:Process:{ConsumerType}` | `Consumer` | Per message received |
@@ -950,26 +932,16 @@ All publish and consume operations are **automatically traced** with no extra co
 
 ### Distributed Trace — End-to-End
 
-`ServiceBusPublisher` injects `traceparent` into `ApplicationProperties`. The consumer reads it and links back. This connects both spans into a single distributed trace:
+`ServiceBusPublisher` injects `traceparent` into `ApplicationProperties`. The consumer reads it and links back:
 
 ```
 [POST /users]
-  └── [ServiceBus:Publish user-created-events]       ← SpanKind.Producer
+  └── [ServiceBus:Publish user-created-events]         ← SpanKind.Producer
           └── [ServiceBus:Process UserCreatedConsumer]  ← SpanKind.Consumer
                   └── [DbCommand: INSERT ...]
 ```
 
 Without this, the publisher and consumer spans appear as **completely separate, unrelated traces**.
-
-### Publisher Span Attributes
-
-```
-messaging.system              = "azureservicebus"
-messaging.operation           = "publish"
-messaging.destination.name    = "queue-or-topic-name"
-messaging.message.id          = "event-guid"
-messaging.message.body.size   = size-in-bytes
-```
 
 ### Consumer Span Attributes
 
@@ -985,16 +957,6 @@ messaging.servicebus.subscription.name  = "subscription"     (topics only)
 messaging.consumer.name                 = "ConsumerClassName"
 messaging.trace.parent                  = "traceparent"      (if present)
 ```
-
-### Span Events
-
-| Event | Span |
-|-------|------|
-| `message.processing.started` | Consumer process span |
-| `message.completed` | Consumer process span |
-| `message.abandoned` | Consumer process span (on error, will be retried) |
-| `message.deadlettered` | Consumer process span (on error, `MaxDeliveryCount` reached) |
-| `consumer.started` | Consumer setup span |
 
 ### Example Queries
 
@@ -1017,14 +979,13 @@ span.attributes["messaging.message.id"] = "your-event-guid"
 
 ```csharp
 [ServiceBusQueue]
-public class OrderCreatedConsumer(ISender sender) : ServiceBusConsumer<OrderCreatedIntegrationEvent>
+public class OrderCreatedConsumer(ISender sender) : IConsumer<OrderCreatedIntegrationEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        OrderCreatedIntegrationEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<OrderCreatedIntegrationEvent> context)
     {
-        await sender.Send(new ProcessOrderCommand(message.OrderId), cancellationToken);
+        await sender.Send(
+            new ProcessOrderCommand(context.Message.OrderId),
+            context.CancellationToken);
     }
 }
 ```
@@ -1033,20 +994,17 @@ public class OrderCreatedConsumer(ISender sender) : ServiceBusConsumer<OrderCrea
 
 ```csharp
 [ServiceBusQueue]
-public class OrderStatusConsumer(ApplicationDbContext dbContext) : ServiceBusConsumer<OrderStatusEvent>
+public class OrderStatusConsumer(ApplicationDbContext dbContext) : IConsumer<OrderStatusEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        OrderStatusEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<OrderStatusEvent> context)
     {
         Order? order = await dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == message.OrderId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == context.Message.OrderId, context.CancellationToken);
 
-        if (order is null) return; // permanent — complete message
+        if (order is null) return; // permanent — complete the message
 
-        order.Status = message.Status;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        order.Status = context.Message.Status;
+        await dbContext.SaveChangesAsync(context.CancellationToken);
         // DbContext disposed automatically after this returns
     }
 }
@@ -1054,50 +1012,35 @@ public class OrderStatusConsumer(ApplicationDbContext dbContext) : ServiceBusCon
 
 ### Pattern 3: Accessing Message Metadata
 
+Use `context.Metadata` (`MessageContext`) for broker metadata. No Azure SDK import required in your consumer:
+
 ```csharp
 [ServiceBusQueue]
-public class MetadataConsumer : ServiceBusConsumer<MyEvent>
+public class IdempotentConsumer(ApplicationDbContext dbContext) : IConsumer<MyEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        MyEvent message,
-        ServiceBusReceivedMessage originalMessage,  // ← Service Bus metadata here
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<MyEvent> context)
     {
-        // ✅ Good: idempotency check using MessageId
-        if (originalMessage.ApplicationProperties.TryGetValue("EventType", out object? eventType))
+        // Idempotency check using broker-assigned MessageId
+        string messageId = context.Metadata.MessageId;
+        bool alreadyProcessed = await dbContext.ProcessedEvents
+            .AnyAsync(e => e.MessageId == messageId, context.CancellationToken);
+
+        if (alreadyProcessed) return;
+
+        // Custom routing / conditional logic using application properties
+        if (context.Metadata.ApplicationProperties.TryGetValue("EventType", out object? eventType))
         {
-            // use custom property for routing or idempotency decisions...
+            // use for routing decisions...
         }
 
-        // ❌ Don't use DeliveryCount here to limit retries
-        //    → Use MaxDeliveryCount on the attribute instead (see Attribute Reference)
+        await ProcessEvent(context.Message, context.CancellationToken);
+        dbContext.ProcessedEvents.Add(new ProcessedEvent { MessageId = messageId });
+        await dbContext.SaveChangesAsync(context.CancellationToken);
     }
 }
 ```
 
-### Pattern 4: Custom JSON Deserialization
-
-```csharp
-[ServiceBusQueue]
-public class CustomSerializationConsumer : ServiceBusConsumer<MyComplexEvent>
-{
-    // Override to customise deserialization
-    protected override JsonSerializerOptions JsonSerializerOptions => new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
-    protected override async Task ProcessMessageAsync(
-        MyComplexEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
-    {
-        // message already deserialized with custom options above
-    }
-}
-```
+Available `MessageContext` properties: `MessageId`, `SessionId`, `CorrelationId`, `DeliveryCount`, `SequenceNumber`, `EnqueuedTime`, `ContentType`, `Subject`, `ApplicationProperties`.
 
 ---
 
@@ -1111,7 +1054,7 @@ public class CustomSerializationConsumer : ServiceBusConsumer<MyComplexEvent>
 
 ⚠️ TRANSIENT ERROR — throw exception
   → Message abandoned, returns to queue for retry
-  → Dead-lettered after MaxDeliveryCount attempts (attribute or Azure entity setting)
+  → Dead-lettered after MaxDeliveryCount attempts
 
 🛑 PERMANENT ERROR — catch and don't re-throw
   → Message completed and removed (no retry)
@@ -1121,16 +1064,13 @@ public class CustomSerializationConsumer : ServiceBusConsumer<MyComplexEvent>
 
 ```csharp
 [ServiceBusQueue]
-public class PaymentConsumer(ILogger<PaymentConsumer> logger) : ServiceBusConsumer<PaymentEvent>
+public class PaymentConsumer(ILogger<PaymentConsumer> logger) : IConsumer<PaymentEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        PaymentEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<PaymentEvent> context)
     {
         try
         {
-            await ProcessPayment(message, cancellationToken);
+            await ProcessPayment(context.Message, context.CancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -1138,7 +1078,7 @@ public class PaymentConsumer(ILogger<PaymentConsumer> logger) : ServiceBusConsum
         }
         catch (ValidationException ex)
         {
-            logger.LogError(ex, "Invalid payment data for event {EventId}", message.Id);
+            logger.LogError(ex, "Invalid payment data for event {EventId}", context.Message.Id);
             // permanent — don't throw, complete the message
         }
     }
@@ -1147,51 +1087,41 @@ public class PaymentConsumer(ILogger<PaymentConsumer> logger) : ServiceBusConsum
 
 ### Strategy 2: Limiting Delivery Attempts with `MaxDeliveryCount` ✅ RECOMMENDED
 
-Use the `MaxDeliveryCount` attribute property to dead-letter a message after N failed attempts, **without any code inside the consumer**. The framework handles it automatically.
-
-The attribute is the **sole source of truth** for the retry budget. Azure entities should be provisioned with a high `MaxDeliveryCount` (e.g. `100`) so the broker never interferes — see the [Consumer Attribute Reference](#-consumer-attribute-reference) for the full design rationale.
+Use the `MaxDeliveryCount` attribute property to dead-letter a message after N failed attempts, **without any code inside the consumer**:
 
 ```csharp
 // Dead-letter after 3 failed attempts — zero extra code in the consumer
 [ServiceBusQueue(MaxDeliveryCount = 3)]
-public class PaymentConsumer : ServiceBusConsumer<PaymentEvent>
+public class PaymentConsumer : IConsumer<PaymentEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        PaymentEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<PaymentEvent> context)
     {
         // If this throws, the framework checks DeliveryCount automatically:
         // Attempt 1 → abandon | Attempt 2 → abandon | Attempt 3 → dead-letter
-        await ProcessPayment(message, cancellationToken);
+        await ProcessPayment(context.Message, context.CancellationToken);
     }
 }
 ```
 
 ### Strategy 3: Delivery Count Guard (Business Logic)
 
-Use `originalMessage.DeliveryCount` inside `ProcessMessageAsync` when you need **business-logic decisions** based on how many times a message has been attempted — for example, falling back to a degraded code path on later attempts.
-
-> ℹ️ For simply *limiting total retries*, prefer the `MaxDeliveryCount` attribute (Strategy 2). Use this pattern only when the delivery count needs to influence your processing logic.
+Use `context.Metadata.DeliveryCount` when you need **business-logic decisions** based on how many times a message has been attempted:
 
 ```csharp
 [ServiceBusQueue]
-public class SafeConsumer(ILogger<SafeConsumer> logger) : ServiceBusConsumer<MyEvent>
+public class SafeConsumer(ILogger<SafeConsumer> logger) : IConsumer<MyEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        MyEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<MyEvent> context)
     {
-        if (originalMessage.DeliveryCount > 5)
+        if (context.Metadata.DeliveryCount > 5)
         {
             logger.LogError(
                 "Message {MessageId} exceeded max retries. Completing to prevent infinite loop.",
-                originalMessage.MessageId);
+                context.Metadata.MessageId);
             return; // complete without retry
         }
 
-        await DoWork(message, cancellationToken);
+        await DoWork(context.Message, context.CancellationToken);
     }
 }
 ```
@@ -1200,22 +1130,18 @@ public class SafeConsumer(ILogger<SafeConsumer> logger) : ServiceBusConsumer<MyE
 
 ```csharp
 [ServiceBusQueue]
-public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBusConsumer<OrderCreatedEvent>
+public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : IConsumer<OrderCreatedEvent>
 {
-    protected override async Task ProcessMessageAsync(
-        OrderCreatedEvent message,
-        ServiceBusReceivedMessage originalMessage,
-        CancellationToken cancellationToken)
+    public async Task Consume(IConsumeContext<OrderCreatedEvent> context)
     {
-        // Guard against duplicate delivery
         bool alreadyProcessed = await dbContext.ProcessedEvents
-            .AnyAsync(e => e.EventId == message.Id, cancellationToken);
+            .AnyAsync(e => e.EventId == context.Message.Id, context.CancellationToken);
 
         if (alreadyProcessed) return;
 
-        await ProcessOrder(message, cancellationToken);
-        dbContext.ProcessedEvents.Add(new ProcessedEvent { EventId = message.Id });
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await ProcessOrder(context.Message, context.CancellationToken);
+        dbContext.ProcessedEvents.Add(new ProcessedEvent { EventId = context.Message.Id });
+        await dbContext.SaveChangesAsync(context.CancellationToken);
     }
 }
 ```
@@ -1226,14 +1152,16 @@ public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBu
 
 ### ✅ DO
 
+- **Put integration events in a dedicated `*.IntegrationEvents` classlib** — other services can reference only the shared contracts without depending on your consumers or application logic
 - **Annotate every integration event** with `[QueueRoute("...")]` or `[TopicRoute("...")]` — single source of truth
 - **Use `[ServiceBusQueue]` without a name** on consumers — the name is resolved from `[QueueRoute]` on the message type
 - **Use `ServiceBusRoute.GetQueueName<TEvent>()`** in tests and provisioning tools — stays in sync with the attribute
 - **Inject `IEventBusPublisher`** — never `ServiceBusPublisher` or `ServiceBusClient` directly
+- **Reference only `BusWorks.Abstractions`** from application and domain projects — consumers then have zero Azure SDK dependency
 - **Make operations idempotent** — messages can be delivered more than once
 - **Distinguish transient vs permanent errors** — throw for retry, return for complete
-- **Use `MaxDeliveryCount` on the attribute** to limit delivery attempts — avoids boilerplate in `ProcessMessageAsync`
-- **Use `DeliveryCount` in `ProcessMessageAsync`** only for business-logic decisions (e.g. fallback behaviour on later attempts), not for limiting retries
+- **Use `MaxDeliveryCount` on the attribute** to limit delivery attempts — avoids boilerplate in `Consume`
+- **Use `context.Metadata.DeliveryCount`** only for business-logic decisions (e.g. fallback behaviour on later attempts), not for limiting retries
 - **Use MediatR/CQRS** in consumers for clean separation
 - **Rely on OpenTelemetry** for infrastructure observability
 - **Log business events only** — not MessageId, DeliveryCount, etc. (already in spans)
@@ -1247,6 +1175,7 @@ public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBu
 - **Don't hardcode queue/topic name strings** in multiple places — define them once on the event
 - **Don't add the topic name to `[ServiceBusTopic]`** — it comes from `[TopicRoute]` on the event
 - **Don't inject `ServiceBusClient` directly** in application/domain code
+- **Don't reference `Azure.Messaging.ServiceBus`** from consumer or application projects — use `BusWorks.Abstractions` only
 - **Don't log infrastructure details** — already captured in OTel spans
 - **Don't forget idempotency** — duplicate delivery is normal
 - **Don't make consumers `internal`** — consumer discovery requires `public` classes
@@ -1257,10 +1186,12 @@ public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBu
 
 ### 🏆 Checklist
 
+- [ ] Integration events are in a dedicated `*.IntegrationEvents` classlib referencing only `BusWorks.Abstractions`
 - [ ] Integration event inherits `IntegrationEvent` from `BusWorks.Abstractions`
 - [ ] Integration event is annotated with `[QueueRoute("...")]` or `[TopicRoute("...")]`
 - [ ] Consumer class is `public` with `[ServiceBusQueue]` or `[ServiceBusTopic("subscription-name")]`
-- [ ] Consumer inherits `ServiceBusConsumer<TMessage>` or `ServiceBusConsumer`
+- [ ] Consumer implements `IConsumer<TMessage>` (from `BusWorks.Abstractions`)
+- [ ] Consumer project references only `BusWorks.Abstractions` — not the full `BusWorks` package
 - [ ] `MaxDeliveryCount` set on the consumer attribute if a tighter retry budget is needed
 - [ ] Transient vs permanent errors distinguished
 - [ ] Operations are idempotent
@@ -1280,8 +1211,8 @@ public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBu
 
 - Is the class `public`?
 - Does it have `[ServiceBusQueue]` or `[ServiceBusTopic]` attribute?
-- Does it inherit from `ServiceBusConsumer` or `ServiceBusConsumer<T>`?
-- Is it in an assembly registered via `ServiceBusAssemblyRegistry`?
+- Does it implement `IConsumer<TMessage>`?
+- Is the consumer's assembly passed to `AddEventBus(..., typeof(MyConsumer).Assembly)`?
 - Rebuild the solution
 
 ### `InvalidOperationException` at startup — missing route attribute
@@ -1299,8 +1230,6 @@ Fix: add `[QueueRoute("my-queue")]` to the integration event record.
 
 ### `InvalidOperationException` at startup — route/consumer attribute mismatch
 
-If the consumer attribute and the event's route attribute point to different destination types (queue vs topic), the framework detects this at startup with a specific message:
-
 ```
 // Consumer has [ServiceBusQueue] but event has [TopicRoute]:
 Consumer 'ParkEventConsumer' has [ServiceBusQueue] but 'ParkEvent'
@@ -1313,69 +1242,62 @@ is declared as a queue via [QueueRoute("orders")], not a topic.
 Did you mean [ServiceBusQueue] on 'OrderConsumer'?
 ```
 
-Fix: make the consumer attribute match what the event declares — `[ServiceBusQueue]` for `[QueueRoute]` events, `[ServiceBusTopic("sub")]` for `[TopicRoute]` events.
+Fix: make the consumer attribute match what the event declares.
 
 ### `ServiceBus:Setup:Error` span at startup
 
 - Does the queue/topic exist in Azure Service Bus / emulator?
-- Is `ConnectionStrings:ServiceBus` correct in `appsettings.json`?
+- Is the `EventBusOptions` section correct in `appsettings.json`?
 
 ### Publish span has no child consumer span (broken distributed trace)
 
 - Verify `ServiceBusPublisher` is injecting `traceparent` into `ApplicationProperties` (it does by default)
-- Verify the consumer span is reading `ApplicationProperties["traceparent"]` (it does by default)
 - Confirm both publisher and consumer are reporting to the same OTel collector
 
 ### Messages being retried infinitely
 
 - Don't re-throw for permanent errors (validation failures, not-found records, etc.)
-- Set `MaxDeliveryCount` on the `[ServiceBusQueue]` or `[ServiceBusTopic]` attribute to dead-letter after N attempts automatically
-- Ensure Azure entities are provisioned with a high `MaxDeliveryCount` (e.g. `100`) so the broker doesn't dead-letter before the application threshold is reached — see [Consumer Attribute Reference](#-consumer-attribute-reference)
-- Or add a `DeliveryCount > N` guard inside `ProcessMessageAsync` for business-logic-driven decisions
-- Check the dead-letter queue in the Azure Service Bus portal
+- Set `MaxDeliveryCount` on the `[ServiceBusQueue]` or `[ServiceBusTopic]` attribute
+- Ensure Azure entities are provisioned with a high `MaxDeliveryCount` (e.g. `100`)
+- Or add a `context.Metadata.DeliveryCount > N` guard inside `Consume` for business-logic-driven decisions
 
 ### `InvalidOperationException` at startup — session contract mismatch
 
-The framework validates the session contract at startup. You will see one of two errors:
-
 ```
-// RequireSession = true but the message type does not implement ISessionedEvent:
+// RequireSession = true but message does not implement ISessionedEvent:
 Consumer 'PaymentCommandConsumer' has RequireSession = true, but message type
 'PaymentCommand' does not implement ISessionedEvent.
-Add ': ISessionedEvent' to 'PaymentCommand' and expose a SessionId property
-that returns a stable domain key (e.g. customerId, orderId).
 
 // Message implements ISessionedEvent but consumer does not have RequireSession = true:
 Message type 'PaymentCommand' implements ISessionedEvent (declares a SessionId),
 but consumer 'PaymentCommandConsumer' does not have RequireSession = true.
-Either add RequireSession = true to the consumer attribute,
-or remove ISessionedEvent from 'PaymentCommand'.
 ```
 
 Fix: ensure both sides agree — `ISessionedEvent` on the event **and** `RequireSession = true` on the consumer, or neither.
 
 ### Session messages not received / consumer appears idle
 
-- Verify the Azure entity has `requiresSession: true` — a session-enabled queue cannot be consumed by a non-session processor (and vice versa)
-- Verify the publisher is setting `SessionId` on outgoing messages — it does this automatically when the event implements `ISessionedEvent`; check that the event's `SessionId` property returns a non-null, non-empty string
-- Verify `RequireSession = true` is on the consumer attribute
-- Check `MaxConcurrentSessions` — if it is too low and all session slots are held by long-running sessions, new sessions queue up
+- Verify the Azure entity has `requiresSession: true`
+- Verify the event's `SessionId` property returns a non-null, non-empty string
+- Check `MaxConcurrentSessions` — if all slots are held by long-running sessions, new sessions queue up
 
 ### Session messages processing out of order
 
-- Verify `MaxConcurrentCallsPerSession` is `1` (the default) — any higher value allows parallel calls within one session, breaking FIFO
-- Verify only one consumer instance exists for the session queue — multiple competing consumers on the same session-enabled queue is valid (the broker assigns each session to one consumer at a time), but check that no separate non-session processor is also attached to the same queue
+- Verify `MaxConcurrentCallsPerSession` is `1` (the default)
+- Check that no separate non-session processor is also attached to the same queue
 
 ---
 
 ## 📚 Additional Resources
 
-- **Example consumers:** `ExampleServiceBusConsumer.cs`
-- **Consumer implementation:** `ServiceBusProcessorBackgroundService.cs`
-- **Publisher implementation:** `ServiceBusPublisher.cs`
-- **Publisher interface:** `BusWorks.Abstractions/IEventPublisher.cs`
-- **Route attributes:** `BusWorks.Abstractions/RouteAttributes.cs`
-- **Route helper:** `BusWorks.Abstractions/RouteHelper.cs`
+- **Example consumers:** `BusWorks/Consumer/ExampleServiceBusConsumer.cs`
+- **Consumer interfaces:** `BusWorks.Abstractions/Consumer/IConsumer.cs`
+- **Message metadata:** `BusWorks.Abstractions/Consumer/MessageContext.cs`
+- **Consumer background service:** `BusWorks/BackgroundServices/ServiceBusProcessorBackgroundService.cs`
+- **Publisher implementation:** `BusWorks/Publisher/ServiceBusPublisher.cs`
+- **Publisher interface:** `BusWorks.Abstractions/IEventBusPublisher.cs`
+- **Route attributes:** `BusWorks.Abstractions/Attributes/ServiceBusRouteAttributes.cs`
+- **Route helper:** `BusWorks.Abstractions/ServiceBusRoute.cs`
 - **Session interface:** `BusWorks.Abstractions/ISessionedEvent.cs`
 - **Azure Service Bus Docs:** [Microsoft Learn](https://learn.microsoft.com/azure/service-bus-messaging/)
 - **Azure Service Bus Sessions:** [Session documentation](https://learn.microsoft.com/azure/service-bus-messaging/message-sessions)
@@ -1383,5 +1305,11 @@ Fix: ensure both sides agree — `ISessionedEvent` on the event **and** `Require
 
 ---
 
-**Last Updated:** March 28, 2026
-**Files:** `EvenBusOptions.cs`, `ServiceBusPublisher.cs`, `ServiceBusProcessorBackgroundService.cs`, `IEventBusPublisher.cs`, `ServiceBusRouteAttributes.cs`, `ServiceBusRoute.cs`, `IntegrationEvent.cs`, `ISessionedEvent.cs`
+**Last Updated:** March 31, 2026  
+**Key files:** `IConsumer.cs`, `MessageContext.cs`, `IEventBusPublisher.cs`, `ServiceBusRouteAttributes.cs`, `ServiceBusRoute.cs`, `IntegrationEvent.cs`, `ISessionedEvent.cs`, `ServiceBusProcessorBackgroundService.cs`
+
+
+
+
+
+

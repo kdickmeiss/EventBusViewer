@@ -1,4 +1,4 @@
-namespace BusWorks.Attributes;
+﻿namespace BusWorks.Attributes;
 
 /// <summary>
 /// Apply to an integration event record to declare that it is routed to a Service Bus <b>queue</b>.
@@ -32,7 +32,7 @@ public sealed class QueueRouteAttribute(string queueName) : Attribute
 ///
 /// // Consumer – subscription name is consumer-specific, topic name comes from the attribute above.
 /// [ServiceBusTopic("theme-park-service")]
-/// public class AttractionUpdatedConsumer : ServiceBusConsumer&lt;AttractionUpdatedIntegrationEvent&gt; { ... }
+/// public class AttractionUpdatedConsumer : IConsumer&lt;AttractionUpdatedIntegrationEvent&gt; { ... }
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -41,3 +41,4 @@ public sealed class TopicRouteAttribute(string topicName) : Attribute
     /// <summary>The Service Bus topic name.</summary>
     public string TopicName { get; } = topicName;
 }
+

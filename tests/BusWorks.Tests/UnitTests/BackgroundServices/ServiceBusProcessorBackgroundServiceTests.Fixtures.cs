@@ -1,4 +1,3 @@
-using Azure.Messaging.ServiceBus;
 using BusWorks.Attributes;
 using BusWorks.Consumer;
 
@@ -6,7 +5,8 @@ namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
 internal sealed partial class ServiceBusProcessorBackgroundServiceTests
 {
-    // Message types
+    // ── Message types ─────────────────────────────────────────────────────────
+
     [QueueRoute("order-queue")]
     private sealed record QueueMessage(Guid Id, DateTime OccurredOnUtc) : IIntegrationEvent;
 
@@ -20,100 +20,105 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         public string SessionId => Id.ToString();
     }
-    
+
+    // ── Queue consumers ───────────────────────────────────────────────────────
+
     [ServiceBusQueue]
-    private sealed class ImplicitQueueConsumer : ServiceBusConsumer<QueueMessage>
+    private sealed class ImplicitQueueConsumer : IConsumer<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue("explicit-queue")]
-    private sealed class ExplicitQueueConsumer : ServiceBusConsumer<QueueMessage>
+    private sealed class ExplicitQueueConsumer : IConsumer<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue(RequireSession = true, MaxDeliveryCount = 3)]
-    private sealed class SessionQueueConsumer : ServiceBusConsumer<SessionMessage>
+    private sealed class SessionQueueConsumer : IConsumer<SessionMessage>
     {
-        protected override Task ProcessMessageAsync(SessionMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<SessionMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue(MaxDeliveryCount = -1)]
-    private sealed class NegativeDeliveryCountQueueConsumer : ServiceBusConsumer<QueueMessage>
+    private sealed class NegativeDeliveryCountQueueConsumer : IConsumer<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue]  // Queue consumer, but message type has [TopicRoute]
-    private sealed class QueueConsumerWithTopicMessage : ServiceBusConsumer<TopicMessage>
+    private sealed class QueueConsumerWithTopicMessage : IConsumer<TopicMessage>
     {
-        protected override Task ProcessMessageAsync(TopicMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<TopicMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue]  // Queue consumer, but message type has no route attribute
-    private sealed class QueueConsumerWithUnroutedMessage : ServiceBusConsumer<UnroutedMessage>
+    private sealed class QueueConsumerWithUnroutedMessage : IConsumer<UnroutedMessage>
     {
-        protected override Task ProcessMessageAsync(UnroutedMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    // Topic consumers
-    [ServiceBusTopic("resort-subscription")]
-    private sealed class TopicConsumer : ServiceBusConsumer<TopicMessage>
-    {
-        protected override Task ProcessMessageAsync(TopicMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    [ServiceBusTopic("resort-subscription", MaxDeliveryCount = -1)]
-    private sealed class NegativeDeliveryCountTopicConsumer : ServiceBusConsumer<TopicMessage>
-    {
-        protected override Task ProcessMessageAsync(TopicMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has [QueueRoute]
-    private sealed class TopicConsumerWithQueueMessage : ServiceBusConsumer<QueueMessage>
-    {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has no route attribute
-    private sealed class TopicConsumerWithUnroutedMessage : ServiceBusConsumer<UnroutedMessage>
-    {
-        protected override Task ProcessMessageAsync(UnroutedMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<UnroutedMessage> context) => Task.CompletedTask;
     }
 
     // Consumer with no routing attribute at all
-    private sealed class UnattributedConsumer : ServiceBusConsumer<QueueMessage>
+    private sealed class UnattributedConsumer : IConsumer<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
-    // Raw (non-generic) consumer
-    [ServiceBusQueue("raw-queue")]
-    private sealed class RawQueueConsumer : ServiceBusConsumer
+    // ── Topic consumers ───────────────────────────────────────────────────────
+
+    [ServiceBusTopic("resort-subscription")]
+    private sealed class TopicConsumer : IConsumer<TopicMessage>
     {
-        protected override Task ProcessMessageAsync(ServiceBusReceivedMessage message, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<TopicMessage> context) => Task.CompletedTask;
     }
 
-    // Session contract mismatch fixtures
+    [ServiceBusTopic("resort-subscription", MaxDeliveryCount = -1)]
+    private sealed class NegativeDeliveryCountTopicConsumer : IConsumer<TopicMessage>
+    {
+        public Task Consume(IConsumeContext<TopicMessage> context) => Task.CompletedTask;
+    }
+
+    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has [QueueRoute]
+    private sealed class TopicConsumerWithQueueMessage : IConsumer<QueueMessage>
+    {
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
+    }
+
+    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has no route attribute
+    private sealed class TopicConsumerWithUnroutedMessage : IConsumer<UnroutedMessage>
+    {
+        public Task Consume(IConsumeContext<UnroutedMessage> context) => Task.CompletedTask;
+    }
+
+    // ── Session contract mismatch fixtures ────────────────────────────────────
+
     [ServiceBusQueue]  // RequireSession = false, but message implements ISessionedEvent
-    private sealed class NonSessionConsumerForSessionedMessage : ServiceBusConsumer<SessionMessage>
+    private sealed class NonSessionConsumerForSessionedMessage : IConsumer<SessionMessage>
     {
-        protected override Task ProcessMessageAsync(SessionMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<SessionMessage> context) => Task.CompletedTask;
     }
 
     [ServiceBusQueue(RequireSession = true)]  // RequireSession = true, but message does NOT implement ISessionedEvent
-    private sealed class SessionConsumerForNonSessionedMessage : ServiceBusConsumer<QueueMessage>
+    private sealed class SessionConsumerForNonSessionedMessage : IConsumer<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
-    // GetConsumerMessageType — multi-level inheritance
-    private abstract class GenericConsumerBase<T> : ServiceBusConsumer<T> where T : class, IIntegrationEvent;
+    // ── GetConsumerMessageType — multi-level inheritance ──────────────────────
+
+    // S1694: Intentionally abstract-only — exists purely to add an inheritance level so
+    // GetConsumerMessageType can be tested against a deeply nested consumer type.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S1694:An abstract class should have both abstract and concrete methods",
+        Justification = "Test fixture: sole purpose is adding an inheritance level for GetConsumerMessageType resolution tests.")]
+    private abstract class GenericConsumerBase<T> : IConsumer<T> where T : class, IIntegrationEvent
+    {
+        public abstract Task Consume(IConsumeContext<T> context);
+    }
 
     [ServiceBusQueue]
     private sealed class DeeplyNestedConsumer : GenericConsumerBase<QueueMessage>
     {
-        protected override Task ProcessMessageAsync(QueueMessage message, ServiceBusReceivedMessage originalMessage, CancellationToken cancellationToken) => Task.CompletedTask;
+        public override Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 }

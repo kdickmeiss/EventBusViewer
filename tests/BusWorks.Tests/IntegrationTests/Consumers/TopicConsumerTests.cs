@@ -1,5 +1,6 @@
-﻿using Azure.Messaging.ServiceBus;
-using BusWorks.Consumer;
+﻿using System.Reflection;
+using Azure.Messaging.ServiceBus;
+using BusWorks.BackgroundServices;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
@@ -63,10 +64,18 @@ internal sealed partial class TopicConsumerTests
         var tcs = new TaskCompletionSource<ParkingSpotStatusChangedEvent>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // Instantiate directly — exercises the real ServiceBusConsumer<T> deserialization path.
-        // IServiceBusConsumer is internal and visible here via InternalsVisibleTo.
+        // Instantiate directly — exercises the real BuildTypedProcessor<T> deserialization
+        // and MessageContext mapping path. BuildTypedProcessor is internal and visible here
+        // via InternalsVisibleTo.
         var consumer = new CapturingParkingSpotConsumer(tcs);
-        await ((IServiceBusConsumer)consumer).ProcessMessageInternalAsync(raw, cancellationToken);
+#pragma warning disable S3011
+        var processor = (Func<ServiceBusReceivedMessage, CancellationToken, Task>)
+            typeof(ServiceBusProcessorBackgroundService)
+                .GetMethod("BuildTypedProcessor", BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(typeof(ParkingSpotStatusChangedEvent))
+                .Invoke(null, [consumer])!;
+#pragma warning restore S3011
+        await processor(raw, cancellationToken);
 
         return await tcs.Task;
     }

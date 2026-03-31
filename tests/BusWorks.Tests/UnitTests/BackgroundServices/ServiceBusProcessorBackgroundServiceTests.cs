@@ -212,20 +212,6 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
     }
 
     [Test]
-    public async Task ValidateSessionContract_RawConsumer_SkipsValidation()
-    {
-        // Raw (non-generic) consumers have no message type — ValidateSessionContract
-        // returns early without throwing, regardless of RequireSession.
-        ServiceBusEndpoint endpoint = new("raw-queue", RequireSession: false);
-
-        InvalidOperationException? exception = null;
-        try { InvokeValidateSessionContract(typeof(RawQueueConsumer), endpoint); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        await Assert.That(exception).IsNull();
-    }
-
-    [Test]
     public async Task GetConsumerMessageType_GenericConsumer_ReturnsMessageType()
     {
         Type? messageType = InvokeGetConsumerMessageType(typeof(ImplicitQueueConsumer));
@@ -233,15 +219,6 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
         await Assert.That(messageType).IsEqualTo(typeof(QueueMessage));
     }
 
-    [Test]
-    public async Task GetConsumerMessageType_RawConsumer_ReturnsNull()
-    {
-        // Non-generic ServiceBusConsumer has no TMessage — returns null so callers
-        // can skip operations that require a message type (e.g. route resolution).
-        Type? messageType = InvokeGetConsumerMessageType(typeof(RawQueueConsumer));
-
-        await Assert.That(messageType).IsNull();
-    }
 
     [Test]
     public async Task GetConsumerMessageType_DeeplyNestedConsumer_ReturnsMessageType()

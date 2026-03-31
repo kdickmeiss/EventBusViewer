@@ -1,5 +1,4 @@
-﻿using Azure.Messaging.ServiceBus;
-using BusWorks.Attributes;
+﻿using BusWorks.Attributes;
 using BusWorks.Consumer;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
@@ -31,14 +30,11 @@ internal sealed partial class TopicConsumerTests
     [ServiceBusTopic(SubscriptionName)]
     internal sealed class CapturingParkingSpotConsumer(
         TaskCompletionSource<ParkingSpotStatusChangedEvent> completion)
-        : ServiceBusConsumer<ParkingSpotStatusChangedEvent>
+        : IConsumer<ParkingSpotStatusChangedEvent>
     {
-        protected override Task ProcessMessageAsync(
-            ParkingSpotStatusChangedEvent message,
-            ServiceBusReceivedMessage originalMessage,
-            CancellationToken cancellationToken)
+        public Task Consume(IConsumeContext<ParkingSpotStatusChangedEvent> context)
         {
-            completion.TrySetResult(message);
+            completion.TrySetResult(context.Message);
             return Task.CompletedTask;
         }
     }

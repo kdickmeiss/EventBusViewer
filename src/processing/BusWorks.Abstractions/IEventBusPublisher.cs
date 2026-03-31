@@ -1,4 +1,4 @@
-using BusWorks.Attributes;
+﻿using BusWorks.Attributes;
 
 namespace BusWorks;
 
@@ -12,3 +12,4 @@ public interface IEventBusPublisher
     Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
         where TEvent : IIntegrationEvent;
 }
+

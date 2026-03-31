@@ -43,4 +43,3 @@ public interface ISessionedEvent : IIntegrationEvent
     string SessionId { get; }
 }
 
-

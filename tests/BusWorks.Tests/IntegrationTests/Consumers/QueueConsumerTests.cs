@@ -1,5 +1,6 @@
-﻿using Azure.Messaging.ServiceBus;
-using BusWorks.Consumer;
+﻿using System.Reflection;
+using Azure.Messaging.ServiceBus;
+using BusWorks.BackgroundServices;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
@@ -48,10 +49,17 @@ internal sealed partial class QueueConsumerTests
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Instantiate the consumer directly — bypasses DI/background service but exercises
-        // the real ServiceBusConsumer<T>.ProcessMessageInternalAsync deserialization path.
-        // IServiceBusConsumer is internal and visible here via InternalsVisibleTo.
+        // the real BuildTypedProcessor<T> deserialization and MessageContext mapping path.
+        // BuildTypedProcessor is internal and visible here via InternalsVisibleTo.
         var consumer = new CapturingParkingReservationConsumer(tcs);
-        await ((IServiceBusConsumer)consumer).ProcessMessageInternalAsync(raw, cancellationToken);
+#pragma warning disable S3011
+        var processor = (Func<ServiceBusReceivedMessage, CancellationToken, Task>)
+            typeof(ServiceBusProcessorBackgroundService)
+                .GetMethod("BuildTypedProcessor", BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(typeof(ParkingReservationCreatedEvent))
+                .Invoke(null, [consumer])!;
+#pragma warning restore S3011
+        await processor(raw, cancellationToken);
 
         return await tcs.Task;
     }
@@ -122,7 +130,14 @@ internal sealed partial class QueueConsumerTests
         var tcs = new TaskCompletionSource<ParkingReservationCreatedEvent>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var consumer = new CapturingParkingReservationConsumer(tcs);
-        await ((IServiceBusConsumer)consumer).ProcessMessageInternalAsync(raw!, CancellationToken.None);
+#pragma warning disable S3011
+        var processor = (Func<ServiceBusReceivedMessage, CancellationToken, Task>)
+            typeof(ServiceBusProcessorBackgroundService)
+                .GetMethod("BuildTypedProcessor", BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(typeof(ParkingReservationCreatedEvent))
+                .Invoke(null, [consumer])!;
+#pragma warning restore S3011
+        await processor(raw!, CancellationToken.None);
 
         ParkingReservationCreatedEvent received = await tcs.Task;
 

@@ -1,4 +1,4 @@
-﻿namespace BusWorks.Consumer;
+﻿namespace BusWorks.Abstractions.Consumer;
 
 /// <summary>
 /// Broker-agnostic metadata for a received message, populated by the framework before

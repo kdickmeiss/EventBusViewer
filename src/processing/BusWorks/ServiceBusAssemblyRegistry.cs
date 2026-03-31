@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.Consumer;
 
 namespace BusWorks;

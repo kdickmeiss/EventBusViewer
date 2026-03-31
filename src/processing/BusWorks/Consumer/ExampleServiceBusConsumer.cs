@@ -1,4 +1,6 @@
-using BusWorks.Attributes;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Consumer;
 using Microsoft.Extensions.Logging;
 
 namespace BusWorks.Consumer;

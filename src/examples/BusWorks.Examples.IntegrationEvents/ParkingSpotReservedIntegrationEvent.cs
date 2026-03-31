@@ -1,4 +1,6 @@
-﻿namespace BusWorks.Examples.IntegrationEvents;
+﻿using BusWorks.Abstractions;
+
+namespace BusWorks.Examples.IntegrationEvents;
 
 public record ParkingSpotReservedIntegrationEvent(
     Guid Id,

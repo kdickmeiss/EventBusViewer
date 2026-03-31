@@ -1,4 +1,6 @@
-using BusWorks.Attributes;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.Consumer;
 
 namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;

@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Attributes;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.Consumer;
 using BusWorks.Options;
 using Microsoft.Extensions.DependencyInjection;

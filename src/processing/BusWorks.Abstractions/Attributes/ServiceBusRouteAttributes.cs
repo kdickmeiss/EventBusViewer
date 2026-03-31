@@ -1,4 +1,4 @@
-﻿namespace BusWorks.Attributes;
+﻿namespace BusWorks.Abstractions.Attributes;
 
 /// <summary>
 /// Apply to an integration event record to declare that it is routed to a Service Bus <b>queue</b>.

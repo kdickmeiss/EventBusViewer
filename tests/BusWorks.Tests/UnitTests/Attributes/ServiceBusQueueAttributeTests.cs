@@ -1,4 +1,4 @@
-using BusWorks.Attributes;
+using BusWorks.Abstractions.Attributes;
 
 namespace BusWorks.Tests.UnitTests.Attributes;
 

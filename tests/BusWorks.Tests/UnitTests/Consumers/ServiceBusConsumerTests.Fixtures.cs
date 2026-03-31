@@ -1,4 +1,5 @@
-using BusWorks.Consumer;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Consumer;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 

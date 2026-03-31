@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
-using BusWorks.Attributes;
+using BusWorks.Abstractions.Attributes;
 
-namespace BusWorks;
+namespace BusWorks.Abstractions;
 
 /// <summary>
 /// Utility for resolving the Service Bus destination declared on an integration event type via

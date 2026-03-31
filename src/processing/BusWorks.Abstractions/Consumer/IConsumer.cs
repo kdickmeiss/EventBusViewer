@@ -1,4 +1,6 @@
-﻿namespace BusWorks.Consumer;
+﻿using BusWorks.Abstractions.Attributes;
+
+namespace BusWorks.Abstractions.Consumer;
 
 /// <summary>
 /// Provides access to the deserialized message and its broker metadata inside a consumer.
@@ -24,8 +26,8 @@ public interface IConsumeContext<out TMessage> where TMessage : class, IIntegrat
 /// Defines a strongly-typed Service Bus message consumer with automatic JSON deserialization.
 /// <para>
 /// Implement this interface, inject your dependencies via the constructor, and decorate the
-/// class with <see cref="BusWorks.Attributes.ServiceBusQueueAttribute"/> or
-/// <see cref="BusWorks.Attributes.ServiceBusTopicAttribute"/>.
+/// class with <see cref="ServiceBusQueueAttribute"/> or
+/// <see cref="ServiceBusTopicAttribute"/>.
 /// The framework handles deserialization, DI scoping, distributed tracing, and error handling.
 /// </para>
 /// </summary>

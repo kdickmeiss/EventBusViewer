@@ -1,4 +1,4 @@
-﻿namespace BusWorks;
+﻿namespace BusWorks.Abstractions;
 
 public interface IIntegrationEvent
 {

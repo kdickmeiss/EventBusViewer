@@ -1,3 +1,4 @@
+using BusWorks.Abstractions.Consumer;
 using BusWorks.Consumer;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 

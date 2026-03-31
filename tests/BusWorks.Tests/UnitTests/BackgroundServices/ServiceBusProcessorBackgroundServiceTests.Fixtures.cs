@@ -1,5 +1,6 @@
-using BusWorks.Attributes;
-using BusWorks.Consumer;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Consumer;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using Azure.Identity;
 using Azure.Messaging.ServiceBus;
+using BusWorks.Abstractions;
 using BusWorks.BackgroundServices;
 using BusWorks.Options;
 using BusWorks.Publisher;

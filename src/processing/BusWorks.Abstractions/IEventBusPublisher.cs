@@ -1,6 +1,6 @@
-﻿using BusWorks.Attributes;
+﻿using BusWorks.Abstractions.Attributes;
 
-namespace BusWorks;
+namespace BusWorks.Abstractions;
 
 public interface IEventBusPublisher
 {

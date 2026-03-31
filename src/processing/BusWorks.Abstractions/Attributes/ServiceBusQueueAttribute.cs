@@ -1,7 +1,9 @@
-﻿namespace BusWorks.Attributes;
+﻿using BusWorks.Abstractions.Consumer;
+
+namespace BusWorks.Abstractions.Attributes;
 
 /// <summary>
-/// Attribute to specify a queue for an <see cref="BusWorks.Consumer.IConsumer{TMessage}"/>.
+/// Attribute to specify a queue for an <see cref="IConsumer{TMessage}"/>.
 /// <para>
 /// <b>Recommended usage (no explicit name):</b> omit the queue name and let it be resolved
 /// automatically from the <see cref="QueueRouteAttribute"/> on the message type.

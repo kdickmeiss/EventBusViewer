@@ -1,4 +1,6 @@
 using System.Text.Json;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Consumer;
 
 namespace BusWorks.Consumer;
 

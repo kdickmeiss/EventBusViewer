@@ -1,7 +1,8 @@
 ﻿using System.Reflection;
 using Azure.Messaging.ServiceBus;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.BackgroundServices;
-using BusWorks.Consumer;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 

@@ -1,7 +1,9 @@
-﻿namespace BusWorks.Attributes;
+﻿using BusWorks.Abstractions.Consumer;
+
+namespace BusWorks.Abstractions.Attributes;
 
 /// <summary>
-/// Attribute to specify a topic subscription for an <see cref="BusWorks.Consumer.IConsumer{TMessage}"/>.
+/// Attribute to specify a topic subscription for an <see cref="IConsumer{TMessage}"/>.
 /// <para>
 /// The <b>topic name</b> is resolved automatically from the <see cref="TopicRouteAttribute"/>
 /// on the consumer's message type — it is the single source of truth.

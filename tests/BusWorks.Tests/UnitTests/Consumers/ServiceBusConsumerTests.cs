@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
+using BusWorks.Abstractions;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.BackgroundServices;
 using BusWorks.Consumer;
 

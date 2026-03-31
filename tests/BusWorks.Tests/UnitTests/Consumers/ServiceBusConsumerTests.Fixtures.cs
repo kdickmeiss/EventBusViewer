@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Consumer;
 
 namespace BusWorks.Tests.UnitTests.Consumers;

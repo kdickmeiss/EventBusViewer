@@ -1,7 +1,6 @@
 using System.Reflection;
 using Azure.Identity;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.BackgroundServices;
 using BusWorks.Options;
 using BusWorks.Publisher;
@@ -64,9 +63,14 @@ public static class DependencyInjection
 
         services.Configure<EventBusOptions>(configuration.GetSection(EventBusOptions.SectionName));
 
+        var registry = new ServiceBusAssemblyRegistry(consumerAssemblies);
+
+        foreach (Type consumerType in registry.GetConsumerTypes())
+            services.AddScoped(consumerType);
+
         services
             .AddSingleton(serviceBusClient)
-            .AddSingleton(new ServiceBusAssemblyRegistry(consumerAssemblies))
+            .AddSingleton(registry)
             .AddSingleton<IEventBusPublisher, ServiceBusPublisher>();
 
         services.AddHostedService<ServiceBusProcessorBackgroundService>();

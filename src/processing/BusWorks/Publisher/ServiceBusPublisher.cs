@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
+using BusWorks.Attributes;
 using OpenTelemetry.Trace;
 
 namespace BusWorks.Publisher;

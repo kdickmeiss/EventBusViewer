@@ -1,5 +1,4 @@
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Attributes;
 using BusWorks.Consumer;
 

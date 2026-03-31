@@ -1,4 +1,4 @@
-﻿namespace BusWorks.Abstractions;
+﻿namespace BusWorks;
 
 /// <summary>
 /// Opt-in interface for integration events that require FIFO ordering per session.

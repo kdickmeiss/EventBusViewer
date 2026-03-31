@@ -1,5 +1,4 @@
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Options;
 using BusWorks.Publisher;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;

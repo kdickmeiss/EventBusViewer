@@ -1,6 +1,6 @@
 using System.Reflection;
+using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Attributes;
 using BusWorks.Consumer;
 using BusWorks.Options;
@@ -43,7 +43,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         await WaitForApplicationStartup();
 
-        List<Type> consumerTypes = DiscoverConsumerTypes();
+        IReadOnlyList<Type> consumerTypes = assemblyRegistry.GetConsumerTypes();
 
         using TelemetrySpan startupSpan = tracer.StartActiveSpan("ServiceBus:Startup");
         startupSpan.SetAttribute("servicebus.consumers.count", consumerTypes.Count);
@@ -71,15 +71,6 @@ internal sealed class ServiceBusProcessorBackgroundService(
         await tcs.Task;
     }
 
-    private List<Type> DiscoverConsumerTypes()
-    {
-        return assemblyRegistry.GetAssemblies()
-            .SelectMany(assembly => assembly.GetTypes())
-            .Where(t => t is { IsClass: true, IsAbstract: false } &&
-                        typeof(IServiceBusConsumer).IsAssignableFrom(t))
-            .ToList();
-    }
-
     private async Task<bool> SetupConsumerAsync(Type consumerType, CancellationToken stoppingToken)
     {
         try
@@ -93,10 +84,16 @@ internal sealed class ServiceBusProcessorBackgroundService(
 
             string endpointDescription = GetEndpointDescription(endpoint);
 
+            // Pre-build the processor factory once per consumer type — keeps MakeGenericMethod
+            // and Invoke out of the per-message hot path.
+            string consumerName = consumerType.Name;
+            Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory =
+                BuildProcessorFactory(consumerType);
+
             if (endpoint.RequireSession)
             {
                 ServiceBusSessionProcessor sessionProcessor = CreateSessionProcessor(endpoint);
-                ConfigureSessionMessageHandler(sessionProcessor, consumerType, endpoint, endpointDescription);
+                ConfigureSessionMessageHandler(sessionProcessor, consumerName, processorFactory, endpoint, endpointDescription);
                 ConfigureSessionErrorHandler(sessionProcessor, consumerType, endpointDescription);
                 await sessionProcessor.StartProcessingAsync(stoppingToken);
                 _serviceBusSessionProcessors.Add(sessionProcessor);
@@ -104,7 +101,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
             else
             {
                 ServiceBusProcessor processor = CreateProcessor(endpoint);
-                ConfigureMessageHandler(processor, consumerType, endpoint, endpointDescription);
+                ConfigureMessageHandler(processor, consumerName, processorFactory, endpoint, endpointDescription);
                 ConfigureErrorHandler(processor, consumerType, endpointDescription);
                 await processor.StartProcessingAsync(stoppingToken);
                 _serviceBusProcessors.Add(processor);
@@ -171,23 +168,24 @@ internal sealed class ServiceBusProcessorBackgroundService(
 
     private void ConfigureMessageHandler(
         ServiceBusProcessor processor,
-        Type consumerType,
+        string consumerName,
+        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory,
         ServiceBusEndpoint endpoint,
         string endpointDescription)
     {
         processor.ProcessMessageAsync += async args =>
         {
             using IServiceScope scope = serviceScopeFactory.CreateScope();
-            using TelemetrySpan messageSpan = CreateMessageSpan(consumerType, endpoint, args.Message);
+            using TelemetrySpan messageSpan = CreateMessageSpan(consumerName, endpoint, args.Message);
 
             try
             {
                 messageSpan.AddEvent("message.processing.started");
 
-                var consumerInstance = (IServiceBusConsumer)ActivatorUtilities.CreateInstance(
-                    scope.ServiceProvider, consumerType);
+                Func<ServiceBusReceivedMessage, CancellationToken, Task> process =
+                    processorFactory(scope.ServiceProvider);
 
-                await consumerInstance.ProcessMessageInternalAsync(args.Message, args.CancellationToken);
+                await process(args.Message, args.CancellationToken);
                 await args.CompleteMessageAsync(args.Message, args.CancellationToken);
 
                 messageSpan.AddEvent("message.completed");
@@ -195,7 +193,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
             }
             catch (Exception ex)
             {
-                HandleMessageProcessingError(scope, messageSpan, args, ex, endpointDescription);
+                HandleMessageProcessingError(messageSpan, args, ex, endpointDescription);
 
                 if (endpoint.MaxDeliveryCount > 0 && args.Message.DeliveryCount >= endpoint.MaxDeliveryCount)
                 {
@@ -217,24 +215,25 @@ internal sealed class ServiceBusProcessorBackgroundService(
 
     private void ConfigureSessionMessageHandler(
         ServiceBusSessionProcessor processor,
-        Type consumerType,
+        string consumerName,
+        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory,
         ServiceBusEndpoint endpoint,
         string endpointDescription)
     {
         processor.ProcessMessageAsync += async args =>
         {
             using IServiceScope scope = serviceScopeFactory.CreateScope();
-            using TelemetrySpan messageSpan = CreateMessageSpan(consumerType, endpoint, args.Message);
+            using TelemetrySpan messageSpan = CreateMessageSpan(consumerName, endpoint, args.Message);
             messageSpan.SetAttribute("messaging.servicebus.session_id", args.SessionId);
 
             try
             {
                 messageSpan.AddEvent("message.processing.started");
 
-                var consumerInstance = (IServiceBusConsumer)ActivatorUtilities.CreateInstance(
-                    scope.ServiceProvider, consumerType);
+                Func<ServiceBusReceivedMessage, CancellationToken, Task> process =
+                    processorFactory(scope.ServiceProvider);
 
-                await consumerInstance.ProcessMessageInternalAsync(args.Message, args.CancellationToken);
+                await process(args.Message, args.CancellationToken);
                 await args.CompleteMessageAsync(args.Message, args.CancellationToken);
 
                 messageSpan.AddEvent("message.completed");
@@ -242,10 +241,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
             }
             catch (Exception ex)
             {
-                ILogger<ServiceBusProcessorBackgroundService> scopedLogger =
-                    scope.ServiceProvider.GetRequiredService<ILogger<ServiceBusProcessorBackgroundService>>();
-
-                scopedLogger.LogError(
+                logger.LogError(
                     ex,
                     "Error processing session message from {Endpoint}, SessionId: {SessionId}, MessageId: {MessageId}",
                     endpointDescription,
@@ -273,10 +269,10 @@ internal sealed class ServiceBusProcessorBackgroundService(
         };
     }
 
-    private TelemetrySpan CreateMessageSpan(Type consumerType, ServiceBusEndpoint endpoint, ServiceBusReceivedMessage message)
+    private TelemetrySpan CreateMessageSpan(string consumerName, ServiceBusEndpoint endpoint, ServiceBusReceivedMessage message)
     {
         TelemetrySpan messageSpan = tracer.StartActiveSpan(
-            $"ServiceBus:Process:{consumerType.Name}",
+            $"ServiceBus:Process:{consumerName}",
             SpanKind.Consumer);
 
         messageSpan.SetAttribute("messaging.system", "azureservicebus");
@@ -285,7 +281,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
         messageSpan.SetAttribute("messaging.message.id", message.MessageId);
         messageSpan.SetAttribute("messaging.message.body.size", message.Body.ToMemory().Length);
         messageSpan.SetAttribute("messaging.servicebus.delivery_count", message.DeliveryCount);
-        messageSpan.SetAttribute("messaging.consumer.name", consumerType.Name);
+        messageSpan.SetAttribute("messaging.consumer.name", consumerName);
 
         AddOptionalMessageAttributes(messageSpan, message, endpoint);
 
@@ -310,20 +306,17 @@ internal sealed class ServiceBusProcessorBackgroundService(
             span.SetAttribute("messaging.trace.parent", traceParent.ToString());
     }
 
-    private static void HandleMessageProcessingError(
-        IServiceScope scope,
+    private void HandleMessageProcessingError(
         TelemetrySpan messageSpan,
         ProcessMessageEventArgs args,
         Exception ex,
         string endpointDescription)
     {
-        scope.ServiceProvider
-            .GetRequiredService<ILogger<ServiceBusProcessorBackgroundService>>()
-            .LogError(
-                ex,
-                "Error processing message from {Endpoint} with MessageId: {MessageId}",
-                endpointDescription,
-                args.Message.MessageId);
+        logger.LogError(
+            ex,
+            "Error processing message from {Endpoint} with MessageId: {MessageId}",
+            endpointDescription,
+            args.Message.MessageId);
 
         messageSpan.RecordException(ex);
         messageSpan.SetStatus(Status.Error.WithDescription(ex.Message));
@@ -450,16 +443,67 @@ internal sealed class ServiceBusProcessorBackgroundService(
             $"or can be overridden by passing it directly to [ServiceBusQueue(\"explicit-name\")].");
     }
 
+    // Cached once per app lifetime; BuildProcessorFactory calls MakeGenericMethod at consumer-setup time
+    // so that neither MakeGenericMethod nor Invoke appear on the per-message hot path.
+    private static readonly MethodInfo BuildTypedProcessorMethod =
+        typeof(ServiceBusProcessorBackgroundService)
+            .GetMethod(nameof(BuildTypedProcessor), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    /// <summary>
+    /// Builds a factory delegate that is called once per DI scope (i.e. once per message).
+    /// <see cref="MethodInfo.MakeGenericMethod"/> is called here at consumer-setup time, not per message.
+    /// </summary>
+    private static Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>>
+        BuildProcessorFactory(Type consumerType)
+    {
+        Type messageType = GetConsumerMessageType(consumerType)!;
+        MethodInfo method = BuildTypedProcessorMethod.MakeGenericMethod(messageType);
+        return provider =>
+        {
+            object consumer = provider.GetRequiredService(consumerType);
+            return (Func<ServiceBusReceivedMessage, CancellationToken, Task>)method.Invoke(null, [consumer])!;
+        };
+    }
+
+
+    private static Func<ServiceBusReceivedMessage, CancellationToken, Task> BuildTypedProcessor<TMessage>(
+        IConsumer<TMessage> consumer)
+        where TMessage : class, IIntegrationEvent
+    {
+        return async (message, cancellationToken) =>
+        {
+            TMessage? deserialized = JsonSerializer.Deserialize<TMessage>(
+                message.Body.ToMemory().Span,
+                ServiceBusConsumerDefaults.JsonSerializerOptions);
+
+            if (deserialized is null)
+                throw new InvalidOperationException(
+                    $"Failed to deserialize message {message.MessageId} to type {typeof(TMessage).Name}");
+
+            MessageContext metadata = ToMessageContext(message);
+            await consumer.Consume(new ConsumeContext<TMessage>(deserialized, metadata, cancellationToken));
+        };
+    }
+
+    private static MessageContext ToMessageContext(ServiceBusReceivedMessage m) => new()
+    {
+        MessageId            = m.MessageId,
+        SessionId            = m.SessionId,
+        CorrelationId        = m.CorrelationId,
+        DeliveryCount        = m.DeliveryCount,
+        SequenceNumber       = m.SequenceNumber,
+        EnqueuedTime         = m.EnqueuedTime,
+        ContentType          = m.ContentType,
+        Subject              = m.Subject,
+        ApplicationProperties = m.ApplicationProperties,
+    };
+
     private static Type? GetConsumerMessageType(Type consumerType)
     {
-        Type? current = consumerType;
-        while (current is not null)
-        {
-            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(ServiceBusConsumer<>))
-                return current.GetGenericArguments()[0];
-            current = current.BaseType;
-        }
-        return null;
+        return consumerType.GetInterfaces()
+            .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>))
+            .Select(i => i.GetGenericArguments()[0])
+            .FirstOrDefault();
     }
 
     private static string ResolveQueueNameFromMessageType(Type consumerType, Type? messageType)
@@ -467,7 +511,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
         if (messageType is null)
             throw new InvalidOperationException(
                 $"Consumer '{consumerType.Name}' has [ServiceBusQueue] without an explicit queue name, " +
-                $"but is not a generic ServiceBusConsumer<TMessage> so the name cannot be resolved automatically. " +
+                $"but does not implement IConsumer<TMessage> so the name cannot be resolved automatically. " +
                 $"Pass the name explicitly: [ServiceBusQueue(\"queue-name\")].");
 
         QueueRouteAttribute? queueRoute = messageType.GetCustomAttribute<QueueRouteAttribute>();
@@ -492,9 +536,9 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         if (messageType is null)
             throw new InvalidOperationException(
-                $"Consumer '{consumerType.Name}' has [ServiceBusTopic], but is not a generic ServiceBusConsumer<TMessage>. " +
+                $"Consumer '{consumerType.Name}' has [ServiceBusTopic], but does not implement IConsumer<TMessage>. " +
                 $"The topic name cannot be resolved automatically. " +
-                $"Use ServiceBusConsumer<TMessage> with [TopicRoute(\"topic-name\")] on the message type.");
+                $"Use IConsumer<TMessage> with [TopicRoute(\"topic-name\")] on the message type.");
 
         TopicRouteAttribute? topicRoute = messageType.GetCustomAttribute<TopicRouteAttribute>();
         if (topicRoute is not null)

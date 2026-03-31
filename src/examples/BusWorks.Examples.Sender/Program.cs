@@ -1,6 +1,6 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.Examples.Sender.Menus;
-using BusWorks.Examples.Sender.Menus.Messaging;
+using BusWorks.Examples.Sender.Menus.Queue;
 using BusWorks.Examples.Sender.Services;
 using EventBusViewer.ServiceDefaults;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +16,7 @@ builder.Services.AddSingleton(_ =>
 
 builder.Services.AddSingleton<QueueService>();
 
-builder.Services.AddSingleton<MessagingMenu>();
+builder.Services.AddSingleton<QueueMenu>();
 builder.Services.AddSingleton<MainMenu>();
 
 IHost host = builder.Build();

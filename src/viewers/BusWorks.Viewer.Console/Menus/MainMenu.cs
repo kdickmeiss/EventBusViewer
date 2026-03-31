@@ -15,7 +15,7 @@ public sealed class MainMenu(Queue.QueueMenu queueMenu)
             AnsiConsole.Clear();
 
             AnsiConsole.Write(
-                new FigletText("Parkly EventBus")
+                new FigletText("BusWorks")
                     .Centered()
                     .Color(Color.DeepSkyBlue1));
 
@@ -46,4 +46,3 @@ public sealed class MainMenu(Queue.QueueMenu queueMenu)
         }
     }
 }
-

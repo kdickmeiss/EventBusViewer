@@ -1,12 +1,13 @@
-﻿using BusWorks.Examples.Sender.Menus.Messaging;
+﻿
 using Spectre.Console;
 
 namespace BusWorks.Examples.Sender.Menus;
 
-internal sealed class MainMenu(MessagingMenu messagingMenu)
+internal sealed class MainMenu(Queue.QueueMenu queueMenu)
 {
-    private const string OptionPreDefinedMessages = "Send Pre-Defined Messages";
-    private const string OptionCustomMessage      = "Send Custom Message";
+    private const string OptionQueues = "Queue Management";
+    private const string OptionTopics = "Topic Management";
+    
     private const string OptionExit   = "Exit";
     
     public async Task ShowAsync(CancellationToken cancellationToken = default)
@@ -24,22 +25,22 @@ internal sealed class MainMenu(MessagingMenu messagingMenu)
 
             string choice = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("[bold]What would you liek to do?[/]")
+                    .Title("[bold]What would you like to do?[/]")
                     .HighlightStyle(new Style(Color.DeepSkyBlue1, decoration: Decoration.Bold))
-                    .AddChoices(OptionPreDefinedMessages, OptionCustomMessage, OptionExit));
+                    .AddChoices(OptionQueues, OptionTopics, OptionExit));        
 
             switch (choice)
             {
-                case OptionPreDefinedMessages:
-                    await messagingMenu.SendPredefinedMessages(cancellationToken);
+                case OptionQueues:
+                    await queueMenu.ShowAsync(cancellationToken);
                     break;
-                //
-                // case OptionTopics:
-                //     AnsiConsole.MarkupLine("[yellow]Topic Management is not implemented yet.[/]");
-                //     AnsiConsole.MarkupLine("\n[grey]Press any key to continue…[/]");
-                //     System.Console.ReadKey(intercept: true);
-                //     break;
 
+                case OptionTopics:
+                    AnsiConsole.MarkupLine("[yellow]Topic Management is not implemented yet.[/]");
+                    AnsiConsole.MarkupLine("\n[grey]Press any key to continue…[/]");
+                    Console.ReadKey(intercept: true);
+                    break;
+                
                 case OptionExit:
                     AnsiConsole.MarkupLine("[grey]Goodbye![/]");
                     return;

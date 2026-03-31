@@ -1,4 +1,4 @@
-# BusWorks Processing Guide
+# BusWorks Guide
 
 Comprehensive guide for publishing and consuming messages using BusWorks — a processor for Azure Service Bus messages that hosts a background service for message consumption and publishing, and is extensible for other brokers.
 
@@ -28,19 +28,28 @@ BusWorks follows Clean Architecture — the interface lives in the Application l
 
 ```
 BusWorks.Abstractions/
-    Messaging/
-        IIntegrationEvent.cs         ← base interface for all events
-        IntegrationEvent.cs          ← base record for all events
-        IEventPublisher.cs           ← publisher abstraction (application layer)
-        RouteAttributes.cs           ← [QueueRoute] / [TopicRoute] attributes for events
-        RouteHelper.cs               ← Route helper (tests / provisioning tools)
+    IEventBusPublisher.cs         ← publisher abstraction (application layer)
+    IIntegrationEvent.cs          ← base interface for all events
+    IntegrationEvent.cs           ← base record for all events
+    ISessionedEvent.cs            ← sessioned event interface
+    ServiceBusRoute.cs            ← Route helper (tests / provisioning tools)
+    ServiceBusRouteAttributes.cs  ← [QueueRoute] / [TopicRoute] attributes for events
 
 BusWorks/
+    Attributes/
+        ServiceBusQueueAttribute.cs
+        ServiceBusTopicAttribute.cs
+    BackgroundServices/
+        ServiceBusProcessorBackgroundService.cs  ← consumer background service
+    Consumer/
+        ServiceBusConsumer.cs                    ← consumer base class
+        ExampleServiceBusConsumer.cs             ← example consumer
+    Options/
+        EvenBusOptions.cs                        ← options model
     Publisher/
         ServiceBusPublisher.cs                   ← IEventPublisher implementation
-    Consumer/
-        ServiceBusProcessorBackgroundService.cs  ← consumer base classes + background service
-        ConsumerDiscovery.cs                     ← consumer discovery
+    DependencyInjection.cs
+    ServiceBusAssemblyRegistry.cs
 ```
 
 ### Why split across layers?
@@ -724,11 +733,6 @@ For local development, you have two supported options:
 2. Ensure your user has the correct RBAC role assigned in the Azure Portal.
 3. Run your application with the above configuration.
 
-> **Note:**
-> - Do **not** use `"AuthenticationType": "AzureCli"` — this is not a supported value. The SDK will use your Azure CLI credentials automatically if you use `ManagedIdentity` with no `ClientId`.
-> - If you see errors about `169.254.169.254:80` being unreachable, ensure you are not specifying a `ClientId` for local development, and that you are not using `ManagedIdentity` in an environment that does not support it (such as a local machine without Azure CLI/VS login).
-> - For production, use a system- or user-assigned managed identity, or an Azure AD application registration.
-
 ---
 
 ### Option C — App Registration / Service Principal *(Automation / non-Azure environments)*
@@ -751,6 +755,36 @@ Suitable for CI pipelines, on-premises deployments, or any environment that cann
 ```
 
 > Store `ClientSecret` in Azure Key Vault or a secrets manager — **never commit it to source control**.
+
+---
+
+### Option D — Azure CLI *(Local Development — recommended)*
+
+Uses the Azure CLI's logged-in user for authentication. This is intended for local development and testing only.
+
+```json
+{
+  "EventBusOptions": {
+    "AuthenticationType": "AzureCli",
+    "AzureCli": {
+      "FullyQualifiedNamespace": "my-namespace.servicebus.windows.net"
+    }
+  }
+}
+```
+
+- `FullyQualifiedNamespace` is required (e.g., `my-namespace.servicebus.windows.net`, no `https://`).
+- The Azure CLI must be installed and you must be logged in via `az login`.
+- Your Azure user account must have the appropriate Azure RBAC role (e.g., Azure Service Bus Data Sender/Receiver) on the Service Bus resource.
+
+**How it works:**
+- The Azure SDK uses your Azure CLI credentials for authentication.
+- This is the simplest and most secure way to develop locally without storing secrets or configuring managed identity on your machine.
+
+**Steps:**
+1. Install the Azure CLI and log in using `az login`.
+2. Ensure your user has the correct RBAC role assigned in the Azure Portal.
+3. Run your application with the above configuration.
 
 ---
 
@@ -777,12 +811,18 @@ These optional settings control concurrency and can be added to any configuratio
 
 **Environment-specific tuning:**
 
+appsettings.Development.json:
 ```json
-// appsettings.Development.json
-{ "EventBusOptions": { "MaxConcurrentCalls": 5 } }
+{
+  "EventBusOptions": { "MaxConcurrentCalls": 5 }
+}
+```
 
-// appsettings.Production.json
-{ "EventBusOptions": { "MaxConcurrentCalls": 20 } }
+appsettings.Production.json:
+```json
+{
+  "EventBusOptions": { "MaxConcurrentCalls": 20 }
+}
 ```
 
 ---
@@ -799,6 +839,7 @@ public sealed class EventBusOptions
     public ConnectionStringOptions?      ConnectionString      { get; set; }
     public ManagedIdentityOptions?       ManagedIdentity       { get; set; }
     public ApplicationRegistrationOptions? ApplicationRegistration { get; set; }
+    public AzureCliOptions?              AzureCli              { get; set; }
 
     public int MaxConcurrentCalls          { get; set; } = 10;
     public int MaxConcurrentSessions       { get; set; } = 8;
@@ -809,7 +850,13 @@ public enum EventBusAuthenticationType
 {
     ConnectionString,        // SAS key / emulator
     ManagedIdentity,         // system- or user-assigned MI
-    ApplicationRegistration  // Azure AD client-credentials
+    ApplicationRegistration, // Azure AD client-credentials
+    AzureCli                 // Azure CLI user (local development)
+}
+
+public sealed class AzureCliOptions
+{
+    public string FullyQualifiedNamespace { get; set; } = string.Empty;
 }
 ```
 
@@ -842,16 +889,23 @@ If the wrong sub-section is missing (e.g. `AuthenticationType = ManagedIdentity`
 
 ## 💉 Dependency Injection
 
-### Registration (already done in `AddInfrastructureCommonServices`)
+
+### Registration
+
+All required services are registered via the `AddEventBus` extension method. This method configures the Service Bus client, publisher, consumer background service, and auto-discovers all consumers via reflection.
 
 ```csharp
-services.AddSingleton<ServiceBusClient>(...);
-services.AddSingleton<IEventPublisher, ServiceBusPublisher>();   // publisher
-services.AddSingleton(new ServiceBusAssemblyRegistry(consumerAssemblies));
-services.AddHostedService<ServiceBusProcessorBackgroundService>();  // consumer background service
+// In your service startup (e.g., Program.cs or Startup.cs):
+services.AddEventBus(Configuration, typeof(MyConsumer).Assembly /*, other assemblies with consumers */);
 ```
 
-Consumers are **auto-discovered** via reflection at startup — no manual registration required.
+This single call:
+- Registers the Azure Service Bus client and publisher
+- Registers the background processor service
+- Registers the consumer assembly registry
+- **Auto-discovers all consumers** via reflection—no manual registration is required
+
+> **Note:** The previous reference to `AddInfrastructureCommonServices` is obsolete. Use `AddEventBus` for all event bus service registrations.
 
 ### Consumer Scope Lifecycle
 

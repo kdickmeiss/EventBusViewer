@@ -101,7 +101,7 @@ public sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsync
         string adminConnectionString =
             $"Endpoint=sb://localhost:{adminPort}/;" +
             "SharedAccessKeyName=RootManageSharedAccessKey;" +
-            "SharedAccessKey=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=;" +
+            "SharedAccessKey=SASKEY=;" +
             "UseDevelopmentEmulator=true;";
 
         Client = new ServiceBusClient(ConnectionString);

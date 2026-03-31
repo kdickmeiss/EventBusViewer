@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
-using EventBusViewer.Viewer.Console.Models;
+using BusWorks.Viewer.Console.Models;
 
-namespace EventBusViewer.Viewer.Console.Services;
+namespace BusWorks.Viewer.Console.Services;
 
 public sealed class QueueService(
     ServiceBusAdministrationClient client,

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Spectre.Console;
 
-namespace EventBusViewer.Viewer.Console.Menus.Queue;
+namespace BusWorks.Viewer.Console.Menus.Queue;
 
 public sealed partial class QueueMenu
 {

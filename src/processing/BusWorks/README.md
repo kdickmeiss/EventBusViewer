@@ -1,6 +1,6 @@
 # BusWorks Processing Guide
 
-Comprehensive guide for publishing and consuming messages using BusWorks.Processing — a processor for Azure Service Bus messages that hosts a background service for message consumption and publishing, and is extensible for other brokers.
+Comprehensive guide for publishing and consuming messages using BusWorks — a processor for Azure Service Bus messages that hosts a background service for message consumption and publishing, and is extensible for other brokers.
 
 ## 📚 Table of Contents
 
@@ -24,7 +24,7 @@ Comprehensive guide for publishing and consuming messages using BusWorks.Process
 
 ## 🏗️ Architecture Overview
 
-BusWorks.Processing follows Clean Architecture — the interface lives in the Application layer, the implementation lives in the Infrastructure layer.
+BusWorks follows Clean Architecture — the interface lives in the Application layer, the implementation lives in the Infrastructure layer.
 
 ```
 BusWorks.Abstractions/
@@ -35,7 +35,7 @@ BusWorks.Abstractions/
         RouteAttributes.cs           ← [QueueRoute] / [TopicRoute] attributes for events
         RouteHelper.cs               ← Route helper (tests / provisioning tools)
 
-BusWorks.Processing/
+BusWorks/
     Publisher/
         ServiceBusPublisher.cs                   ← IEventPublisher implementation
     Consumer/
@@ -77,7 +77,7 @@ IEventPublisher.PublishAsync  [ServiceBusQueue] consumer
 Inherit from `IntegrationEvent` and annotate with `[QueueRoute]` (or `[TopicRoute]` for topics):
 
 ```csharp
-using BusWorks.Abstractions.Messaging;
+using BusWorks.Abstractions;
 
 [QueueRoute("user-created-events")]
 public sealed record UserCreatedIntegrationEvent(
@@ -93,7 +93,7 @@ The `[QueueRoute]` attribute is the **single source of truth** for the queue nam
 ### 2. Inject and Publish in a Command Handler
 
 ```csharp
-using BusWorks.Abstractions.Messaging;
+using BusWorks.Abstractions;
 
 public class RegisterUserCommandHandler(IEventPublisher eventBus) : ICommandHandler<RegisterUserCommand>
 {
@@ -136,7 +136,7 @@ private static async Task<IResult> CreateUserAsync(
 
 ### IEventPublisher Interface
 
-Defined in `BusWorks.Abstractions.Messaging`:
+Defined in `BusWorks.Abstractions`:
 
 ```csharp
 public interface IEventPublisher
@@ -167,8 +167,8 @@ You never interact with `ServiceBusPublisher` directly — always inject `IEvent
 Decorate the consumer with `[ServiceBusQueue]` — **no queue name needed** because it is resolved automatically from `[QueueRoute]` on the message type:
 
 ```csharp
-using BusWorks.Abstractions.Messaging;
-using BusWorks.Processing.Consumer;
+using BusWorks.Abstractions;
+using BusWorks.Consumer;
 
 // Queue name comes from [QueueRoute("user-created-events")] on UserCreatedIntegrationEvent
 [ServiceBusQueue]
@@ -1203,7 +1203,7 @@ public class IdempotentOrderConsumer(ApplicationDbContext dbContext) : ServiceBu
 
 ### 🏆 Checklist
 
-- [ ] Integration event inherits `IntegrationEvent` from `BusWorks.Abstractions.Messaging`
+- [ ] Integration event inherits `IntegrationEvent` from `BusWorks.Abstractions`
 - [ ] Integration event is annotated with `[QueueRoute("...")]` or `[TopicRoute("...")]`
 - [ ] Consumer class is `public` with `[ServiceBusQueue]` or `[ServiceBusTopic("subscription-name")]`
 - [ ] Consumer inherits `ServiceBusConsumer<TMessage>` or `ServiceBusConsumer`
@@ -1319,10 +1319,10 @@ Fix: ensure both sides agree — `ISessionedEvent` on the event **and** `Require
 - **Example consumers:** `ExampleServiceBusConsumer.cs`
 - **Consumer implementation:** `ServiceBusProcessorBackgroundService.cs`
 - **Publisher implementation:** `ServiceBusPublisher.cs`
-- **Publisher interface:** `BusWorks.Abstractions.Messaging/IEventPublisher.cs`
-- **Route attributes:** `BusWorks.Abstractions.Messaging/RouteAttributes.cs`
-- **Route helper:** `BusWorks.Abstractions.Messaging/RouteHelper.cs`
-- **Session interface:** `BusWorks.Abstractions.Messaging/ISessionedEvent.cs`
+- **Publisher interface:** `BusWorks.Abstractions/IEventPublisher.cs`
+- **Route attributes:** `BusWorks.Abstractions/RouteAttributes.cs`
+- **Route helper:** `BusWorks.Abstractions/RouteHelper.cs`
+- **Session interface:** `BusWorks.Abstractions/ISessionedEvent.cs`
 - **Azure Service Bus Docs:** [Microsoft Learn](https://learn.microsoft.com/azure/service-bus-messaging/)
 - **Azure Service Bus Sessions:** [Session documentation](https://learn.microsoft.com/azure/service-bus-messaging/message-sessions)
 - **OpenTelemetry Messaging Conventions:** [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/messaging/)

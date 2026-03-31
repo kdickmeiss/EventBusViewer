@@ -1,6 +1,6 @@
 ﻿using Spectre.Console;
 
-namespace EventBusViewer.Viewer.Console.Menus;
+namespace BusWorks.Viewer.Console.Menus;
 
 public sealed class MainMenu(Queue.QueueMenu queueMenu)
 {

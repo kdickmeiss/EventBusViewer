@@ -16,6 +16,9 @@ IResourceBuilder<AzureServiceBusResource> serviceBus = builder
             .WithImageTag("latest");
     });
 
+serviceBus.AddServiceBusQueue("parking-spot-reserved");
+serviceBus.AddServiceBusTopic("parking-ticket-bought").AddServiceBusSubscription("email-notifications");
+
 // On ARM Macs, replace SQL Server with SQL Edge (which supports ARM64)
 if (RuntimeInformation.ProcessArchitecture is (Architecture.Arm64 or Architecture.Arm))
 {
@@ -38,7 +41,7 @@ if (RuntimeInformation.ProcessArchitecture is (Architecture.Arm64 or Architectur
 }
 
 builder
-    .AddProject<BusWorks_Viewer>("client")
+    .AddProject<BusWorks_Viewer>("Viewer")
     .WaitFor(serviceBus)
     .WithReference(serviceBus);
 

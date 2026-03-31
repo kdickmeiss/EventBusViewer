@@ -1,9 +1,9 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
-using EventBusViewer.Viewer.Console.Models;
+using BusWorks.Viewer.Console.Models;
 using Spectre.Console;
 
-namespace EventBusViewer.Viewer.Console.Menus.Queue;
+namespace BusWorks.Viewer.Console.Menus.Queue;
 
 public sealed partial class QueueMenu
 {

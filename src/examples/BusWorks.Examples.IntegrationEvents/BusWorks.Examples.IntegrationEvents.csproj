@@ -1,0 +1,5 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\processing\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-﻿namespace EventBusViewer.Viewer.Console.Models;
+﻿namespace BusWorks.Viewer.Console.Models;
 
 public sealed record QueueInfo(
     string Name,

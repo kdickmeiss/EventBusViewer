@@ -3,14 +3,16 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
     </PropertyGroup>
-    
+
     <ItemGroup>
         <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
         <PackageReference Include="Spectre.Console" Version="0.49.1" />
     </ItemGroup>
-    
+
     <ItemGroup>
-      <ProjectReference Include="..\..\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\..\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\BusWorks.Examples.IntegrationEvents\BusWorks.Examples.IntegrationEvents.csproj" />
     </ItemGroup>
+
 
 </Project>

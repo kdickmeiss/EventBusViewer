@@ -9,6 +9,10 @@
         <Project Path="src\aspire\BusWorks.AppHost\BusWorks.AppHost.csproj" />
         <Project Path="src\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
     </Folder>
+    <Folder Name="/src/examples/">
+        <Project Path="src/examples/BusWorks.Examples.IntegrationEvents/BusWorks.Examples.IntegrationEvents.csproj" />
+        <Project Path="src/examples/BusWorks.Examples.Sender/BusWorks.Examples.Sender.csproj" />
+    </Folder>
     <Folder Name="/src/processing/">
         <Project Path="src\processing\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
         <Project Path="src\processing\BusWorks\BusWorks.csproj" />

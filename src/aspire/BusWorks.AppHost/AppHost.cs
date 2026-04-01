@@ -41,7 +41,11 @@ if (RuntimeInformation.ProcessArchitecture is (Architecture.Arm64 or Architectur
 }
 
 builder
-    .AddProject<BusWorks_Viewer>("Viewer")
+    .AddProject<BusWorks_Viewer>("viewer")
+    .WaitFor(serviceBus)
+    .WithReference(serviceBus);
+
+builder.AddProject<BusWorks_Examples_Receiver>("exampleReceiver")
     .WaitFor(serviceBus)
     .WithReference(serviceBus);
 

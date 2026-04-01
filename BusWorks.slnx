@@ -11,6 +11,7 @@
     </Folder>
     <Folder Name="/src/examples/">
         <Project Path="src/examples/BusWorks.Examples.IntegrationEvents/BusWorks.Examples.IntegrationEvents.csproj" />
+        <Project Path="src/examples/BusWorks.Examples.Receiver/BusWorks.Examples.Receiver.csproj" />
         <Project Path="src/examples/BusWorks.Examples.Sender/BusWorks.Examples.Sender.csproj" />
     </Folder>
     <Folder Name="/src/processing/">

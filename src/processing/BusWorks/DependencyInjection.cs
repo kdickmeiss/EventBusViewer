@@ -12,7 +12,7 @@ namespace BusWorks;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddEventBus(
+    public static IServiceCollection AddBussWorks(
         this IServiceCollection services,
         IConfiguration configuration,
         params Assembly[] consumerAssemblies)

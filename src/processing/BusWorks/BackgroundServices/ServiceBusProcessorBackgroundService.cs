@@ -14,9 +14,6 @@ using OpenTelemetry.Trace;
 
 namespace BusWorks.BackgroundServices;
 
-/// <summary>
-/// Internal record holding the resolved Service Bus endpoint configuration for a consumer.
-/// </summary>
 internal record ServiceBusEndpoint(
     string QueueOrTopicName,
     string? SubscriptionName = null,
@@ -373,8 +370,6 @@ internal sealed class ServiceBusProcessorBackgroundService(
         _serviceBusSessionProcessors.Clear();
     }
 
-    // ── Endpoint resolution ──────────────────────────────────────────────────
-
     /// <summary>
     /// Validates that the session contract is consistent:
     /// <list type="bullet">
@@ -406,9 +401,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 $"Either add RequireSession = true to the consumer attribute, " +
                 $"or remove ISessionedEvent from '{messageType.Name}'.");
     }
-
-    // ── Endpoint resolution ──────────────────────────────────────────────────
-
+    
     private static ServiceBusEndpoint ResolveEndpoint(Type consumerType)
     {
         Type? messageType = GetConsumerMessageType(consumerType);
@@ -452,7 +445,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
             .GetMethod(nameof(BuildTypedProcessor), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     /// <summary>
-    /// Builds a factory delegate that is called once per DI scope (i.e. once per message).
+    /// Builds a factory delegate called once per DI scope (i.e. once per message).
     /// <see cref="MethodInfo.MakeGenericMethod"/> is called here at consumer-setup time, not per message.
     /// </summary>
     private static Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>>
@@ -497,7 +490,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
         EnqueuedTime         = m.EnqueuedTime,
         ContentType          = m.ContentType,
         Subject              = m.Subject,
-        ApplicationProperties = m.ApplicationProperties,
+        ApplicationProperties = m.ApplicationProperties
     };
 
     private static Type? GetConsumerMessageType(Type consumerType)

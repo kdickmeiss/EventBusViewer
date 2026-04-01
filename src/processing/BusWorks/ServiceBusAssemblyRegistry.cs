@@ -5,7 +5,7 @@ using BusWorks.Consumer;
 namespace BusWorks;
 
 /// <summary>
-/// Holds the assemblies registered via <see cref="DependencyInjection.AddBussWorks"/> and
+/// Holds the assemblies registered via <see cref="DependencyInjection.AddBusWorks"/> and
 /// exposes the consumer types discovered within them.
 /// Consumers can live in any number of class libraries — pass each assembly once at registration.
 /// </summary>

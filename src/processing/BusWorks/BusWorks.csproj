@@ -4,8 +4,23 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <IsPackable>true</IsPackable>
+        <PackageId>BusWorks</PackageId>
+        <Authors>Kevin Dickmeiss</Authors>
+        <Description>Azure Service Bus message processor that hosts a background service for message consumption and publishing. Supports queues, topics, sessions (FIFO), dead-lettering, OpenTelemetry tracing, and multiple authentication strategies.</Description>
+        <PackageTags>azure;servicebus;messaging;eventbus;integration-events;opentelemetry;aspnetcore</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryUrl>TODO</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     </PropertyGroup>
     
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\BusWorks.Abstractions\BusWorks.Abstractions.csproj" />
     </ItemGroup>

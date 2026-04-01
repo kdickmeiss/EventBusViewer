@@ -12,7 +12,7 @@ builder.Services.AddSingleton(TracerProvider.Default.GetTracer(builder.Environme
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.AddBussWorks(
+builder.Services.AddBusWorks(
     builder.Configuration, 
     typeof(Program).Assembly);
 

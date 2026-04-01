@@ -1,2 +1,24 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>true</IsPackable>
+        <PackageId>BusWorks.Abstractions</PackageId>
+        <Authors>TODO</Authors>
+        <Description>Framework contracts for BusWorks — zero NuGet dependencies. Reference this package from Application and Domain layers to define integration events and consumers without taking any Azure SDK dependency.</Description>
+        <PackageTags>azure;servicebus;messaging;eventbus;integration-events;abstractions;aspnetcore</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>TODO</PackageProjectUrl>
+        <RepositoryUrl>TODO</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
 </Project>
+
+

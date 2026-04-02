@@ -1,4 +1,9 @@
 <Solution>
+    <Folder Name="/.azureDevops/">
+        <File Path=".azureDevops\GitVersion.yml" />
+        <File Path=".azureDevops\Pipeline.yml" />
+        <File Path="CONTRIBUTING.md" />
+    </Folder>
     <Folder Name="/solution Items/">
         <File Path=".editorconfig" />
         <File Path=".gitignore" />

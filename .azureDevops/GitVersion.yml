@@ -1,0 +1,21 @@
+next-version: 1.0.0
+commit-message-incrementing: Enabled
+
+# Conventional Commits — https://www.conventionalcommits.org
+major-version-bump-message: '^breaking(\(.+\))?:'
+minor-version-bump-message: '^feat(\(.+\))?:'
+patch-version-bump-message: '^(fix|perf)(\(.+\))?:'
+no-bump-message: '^(chore|docs|style|test|build|ci|refactor)(\(.+\))?:'
+
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    deployment-mode: ContinuousDeployment
+    prevent-increment:
+      of-merged-branch: true
+  feature:
+    regex: ^features?[/-]
+    increment: Inherit
+    deployment-mode: ContinuousDelivery
+    label: alpha

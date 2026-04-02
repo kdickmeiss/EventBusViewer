@@ -1,0 +1,133 @@
+trigger:
+  branches:
+    include:
+      - main
+      - 'feature/*'
+      - 'features/*'
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: 'Release'
+  artifactName: 'nuget-packages'
+
+parameters:
+  - name: PublishVstsFeed
+    type: string
+    default: 'Kevin.CleanArchitecture/Nuget.Feed'
+  - name: NuGetServiceConnection
+    type: string
+    default: 'NuGet.org'
+  - name: packableProjects
+    type: object
+    default:
+      - name: BusWorks
+        path: src/processing/BusWorks/BusWorks.csproj
+      - name: BusWorks.Abstractions
+        path: src/processing/BusWorks.Abstractions/BusWorks.Abstractions.csproj
+
+stages:
+  - stage: CI
+    displayName: 'Build, Test & Pack'
+    jobs:
+      - job: build_test_pack
+        displayName: 'Build · Test · Pack'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: gitversion/setup@0
+            displayName: 'Install GitVersion'
+
+          - task: gitversion/execute@0
+            displayName: 'Determine Version'
+            inputs:
+              useConfigFile: true
+              configFilePath: '.azureDevops/GitVersion.yml'
+
+          - script: echo "##[section]Version $(GitVersion.NuGetVersionV2)"
+            displayName: 'Log Version'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore'
+            inputs:
+              command: 'restore'
+              projects: '**/*.slnx'
+              feedsToUse: 'select'
+              vstsFeed: ${{ parameters.PublishVstsFeed }}
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build'
+            inputs:
+              command: 'build'
+              projects: '**/*.slnx'
+              arguments: >-
+                -c $(buildConfiguration)
+                --no-restore
+                /p:Version=$(GitVersion.AssemblySemVer)
+                /p:InformationalVersion=$(GitVersion.InformationalVersion)
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Tests'
+            inputs:
+              command: 'test'
+              projects: 'tests/**/*.csproj'
+              arguments: >-
+                -c $(buildConfiguration)
+                --no-build
+                --coverage
+                --coverage-output-format cobertura
+                --coverage-output $(Agent.TempDirectory)/coverage.cobertura.xml
+              publishTestResults: true
+
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish Code Coverage'
+            inputs:
+              summaryFileLocation: '$(Agent.TempDirectory)/coverage.cobertura.xml'
+
+          - ${{ each project in parameters.packableProjects }}:
+            - task: DotNetCoreCLI@2
+              displayName: 'Pack ${{ project.name }}'
+              condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+              inputs:
+                command: 'pack'
+                packagesToPack: '${{ project.path }}'
+                packDirectory: '$(Build.ArtifactStagingDirectory)/packages/nuget'
+                nobuild: true
+                versioningScheme: 'byEnvVar'
+                versionEnvVar: 'GitVersion.NuGetVersionV2'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/nuget'
+              ArtifactName: '$(artifactName)'
+
+  - stage: PublishInternal
+    displayName: 'Publish — Internal Feed'
+    dependsOn: CI
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: publish_internal
+        displayName: 'Push to Azure Artifacts'
+        environment: 'Nuget-publish-internal'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@1
+                  displayName: 'Download Packages'
+                  inputs:
+                    buildType: 'current'
+                    artifactName: '$(artifactName)'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: DotNetCoreCLI@2
+                  displayName: 'Push to Internal Feed'
+                  inputs:
+                    command: 'push'
+                    packagesToPush: '$(System.ArtifactsDirectory)/**/*.nupkg;!$(System.ArtifactsDirectory)/**/*.symbols.nupkg'
+                    nuGetFeedType: 'internal'
+                    publishVstsFeed: ${{ parameters.PublishVstsFeed }}

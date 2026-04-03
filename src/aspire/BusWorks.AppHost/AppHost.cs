@@ -17,7 +17,8 @@ IResourceBuilder<AzureServiceBusResource> serviceBus = builder
     });
 
 serviceBus.AddServiceBusQueue("parking-spot-reserved");
-serviceBus.AddServiceBusTopic("parking-ticket-bought").AddServiceBusSubscription("email-notifications");
+serviceBus.AddServiceBusTopic("parking-ticket-bought")
+    .AddServiceBusSubscription("email-notifications");
 
 // On ARM Macs, replace SQL Server with SQL Edge (which supports ARM64)
 if (RuntimeInformation.ProcessArchitecture is (Architecture.Arm64 or Architecture.Arm))

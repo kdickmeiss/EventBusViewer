@@ -1,9 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\..\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
       <ProjectReference Include="..\..\processing\BusWorks\BusWorks.csproj" />
       <ProjectReference Include="..\BusWorks.Examples.IntegrationEvents\BusWorks.Examples.IntegrationEvents.csproj" />

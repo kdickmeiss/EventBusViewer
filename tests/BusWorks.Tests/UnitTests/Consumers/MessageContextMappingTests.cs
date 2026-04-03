@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Azure.Messaging.ServiceBus;
+﻿using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.BackgroundServices;
@@ -171,8 +170,6 @@ internal sealed class MessageContextMappingTests
         await Assert.That(md.ApplicationProperties["k"]).IsEqualTo("v");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private static ServiceBusReceivedMessage CreateMessage(
         string messageId = "msg-1",
         string? sessionId = null,
@@ -200,20 +197,13 @@ internal sealed class MessageContextMappingTests
             properties:            applicationProperties);
     }
 
-#pragma warning disable S3011
     private static Task InvokeAsync<T>(
         IConsumer<T> consumer,
         ServiceBusReceivedMessage message,
         CancellationToken ct = default) where T : class, IIntegrationEvent
     {
-        var processor = (Func<ServiceBusReceivedMessage, CancellationToken, Task>)
-            typeof(ServiceBusProcessorBackgroundService)
-                .GetMethod("BuildTypedProcessor", BindingFlags.NonPublic | BindingFlags.Static)!
-                .MakeGenericMethod(typeof(T))
-                .Invoke(null, [consumer])!;
-
+        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor = ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
         return processor(message, ct);
     }
-#pragma warning restore S3011
 }
 

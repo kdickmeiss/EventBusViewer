@@ -2,14 +2,14 @@
 
 namespace BusWorks.Examples.Sender.Services;
 
-internal sealed class QueueService(ServiceBusClient serviceBusClient)
+internal sealed class MessagingService(ServiceBusClient serviceBusClient)
 {
     public async Task SendMessageAsync(
-        string queueName,
+        string destination,
         string messageBody,
         CancellationToken cancellationToken = default)
     {
-        await using ServiceBusSender sender = serviceBusClient.CreateSender(queueName);
+        await using ServiceBusSender sender = serviceBusClient.CreateSender(destination);
 
         var message = new ServiceBusMessage(messageBody)
         {

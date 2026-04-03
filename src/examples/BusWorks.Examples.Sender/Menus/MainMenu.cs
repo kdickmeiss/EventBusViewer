@@ -1,9 +1,10 @@
 ﻿
+using BusWorks.Examples.Sender.Menus.Messaging;
 using Spectre.Console;
 
 namespace BusWorks.Examples.Sender.Menus;
 
-internal sealed class MainMenu(Queue.QueueMenu queueMenu)
+internal sealed class MainMenu(MessagingMenu messagingMenu)
 {
     private const string OptionQueues = "Queue Management";
     private const string OptionTopics = "Topic Management";
@@ -23,22 +24,20 @@ internal sealed class MainMenu(Queue.QueueMenu queueMenu)
 
             AnsiConsole.WriteLine();
 
-            string choice = AnsiConsole.Prompt(
+            string choice = await AnsiConsole.PromptAsync(
                 new SelectionPrompt<string>()
                     .Title("[bold]What would you like to do?[/]")
                     .HighlightStyle(new Style(Color.DeepSkyBlue1, decoration: Decoration.Bold))
-                    .AddChoices(OptionQueues, OptionTopics, OptionExit));        
+                    .AddChoices(OptionQueues, OptionTopics, OptionExit), cancellationToken);        
 
             switch (choice)
             {
                 case OptionQueues:
-                    await queueMenu.ShowAsync(cancellationToken);
+                    await messagingMenu.ShowAsync(true, cancellationToken);
                     break;
 
                 case OptionTopics:
-                    AnsiConsole.MarkupLine("[yellow]Topic Management is not implemented yet.[/]");
-                    AnsiConsole.MarkupLine("\n[grey]Press any key to continue…[/]");
-                    Console.ReadKey(intercept: true);
+                    await messagingMenu.ShowAsync(false, cancellationToken);
                     break;
                 
                 case OptionExit:

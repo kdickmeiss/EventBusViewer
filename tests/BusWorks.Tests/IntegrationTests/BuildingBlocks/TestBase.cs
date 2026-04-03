@@ -6,7 +6,7 @@ using TUnit.Core.Interfaces;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
-public abstract class TestBase : IAsyncInitializer
+internal abstract class TestBase : IAsyncInitializer
 {
     /// <summary>
     /// Shared factory instance for the full test session.
@@ -16,7 +16,7 @@ public abstract class TestBase : IAsyncInitializer
     public required EventBusHostFactory Factory { get; init; } = null!;
 
     /// <summary>The DI container built by the host.</summary>
-    public IServiceProvider Services => Factory.Services;
+    private IServiceProvider Services => Factory.Services;
 
     /// <summary>
     /// The emulator container for tests that need direct broker access
@@ -25,32 +25,32 @@ public abstract class TestBase : IAsyncInitializer
     public AzureServiceBusEmulatorContainer Emulator => Factory.Emulator;
 
     /// <summary>Resolves a required service from the shared DI container.</summary>
-    public T GetRequiredService<T>() where T : notnull =>
+    protected T GetRequiredService<T>() where T : notnull =>
         Services.GetRequiredService<T>();
 
     /// <summary>
     /// Resolves the registered <see cref="IEventBusPublisher"/> and publishes
     /// <paramref name="event"/> — shorthand for the most common "publish, then assert" pattern.
     /// </summary>
-    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+    protected Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
         where TEvent : IIntegrationEvent =>
         GetRequiredService<IEventBusPublisher>().PublishAsync(@event, cancellationToken);
     
     /// <summary>
-    /// Called by TUnit before the first test in the derived class runs.
-    /// Invokes <see cref="ProvisionEntitiesAsync"/> so entity creation is always
-    /// performed after the emulator container is fully started.
-    /// Override to add per-class setup beyond entity provisioning — always call <c>base.InitializeAsync()</c>.
+    /// TUnit lifecycle hook — sealed so derived classes cannot accidentally bypass
+    /// entity provisioning. Override <see cref="ProvisionEntitiesAsync"/> instead.
     /// </summary>
-    public virtual Task InitializeAsync() => ProvisionEntitiesAsync();
-    
-    // ...existing code...
+    public Task InitializeAsync() => ProvisionEntitiesAsync();
 
+    /// <summary>
+    /// Override to create the queues, topics, or subscriptions the test class requires.
+    /// Called automatically by TUnit before the first test in the class runs.
+    /// </summary>
     protected virtual Task ProvisionEntitiesAsync() => Task.CompletedTask;
     
     // ...existing code...
 
-    public async Task EnsureQueueExistsAsync(
+    protected async Task EnsureQueueExistsAsync(
         string queueName,
         Action<CreateQueueOptions>? configure = null)
     {
@@ -85,7 +85,7 @@ public abstract class TestBase : IAsyncInitializer
     /// Creates <paramref name="topicName"/> in the emulator if it does not already exist.
     /// Pass <paramref name="configure"/> to override any option.
     /// </summary>
-    public async Task EnsureTopicExistsAsync(
+    protected async Task EnsureTopicExistsAsync(
         string topicName,
         Action<CreateTopicOptions>? configure = null)
     {
@@ -107,7 +107,7 @@ public abstract class TestBase : IAsyncInitializer
     /// The topic itself must be created first via <see cref="EnsureTopicExistsAsync"/>.
     /// Pass <paramref name="configure"/> to override any option (e.g. add a correlation filter).
     /// </summary>
-    public async Task EnsureSubscriptionExistsAsync(
+    protected async Task EnsureSubscriptionExistsAsync(
         string topicName,
         string subscriptionName,
         Action<CreateSubscriptionOptions>? configure = null)
@@ -125,12 +125,7 @@ public abstract class TestBase : IAsyncInitializer
 
         configure?.Invoke(options);
 
-        try
-        {
-            await Emulator.AdminClient.CreateSubscriptionAsync(options);
-        }
-        catch (ServiceBusException ex)
-            when (ex.Reason == ServiceBusFailureReason.MessagingEntityAlreadyExists) { }
+        await Emulator.AdminClient.CreateSubscriptionAsync(options);
     }
 }
 

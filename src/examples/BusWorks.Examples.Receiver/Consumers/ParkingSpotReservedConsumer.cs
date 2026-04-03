@@ -5,7 +5,7 @@ using BusWorks.Examples.IntegrationEvents;
 namespace BusWorks.Examples.Receiver.Consumers;
 
 [ServiceBusQueue]
-public class ParkingSpotReservedConsumer(
+internal sealed class ParkingSpotReservedConsumer(
     ILogger<ParkingSpotReservedConsumer> logger) : IConsumer<ParkingSpotReservedIntegrationEvent>
 {
     public Task Consume(IConsumeContext<ParkingSpotReservedIntegrationEvent> context)

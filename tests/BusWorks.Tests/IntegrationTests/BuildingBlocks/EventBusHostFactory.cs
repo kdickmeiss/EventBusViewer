@@ -10,7 +10,7 @@ using TUnit.Core.Interfaces;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
-public sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
+internal sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
 {
     /// <summary>
     /// The emulator fixture that manages the container and all entity provisioning.

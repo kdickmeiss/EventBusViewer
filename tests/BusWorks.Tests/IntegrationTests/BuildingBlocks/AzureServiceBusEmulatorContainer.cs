@@ -17,7 +17,7 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// Entity provisioning (queues, topics, subscriptions) is intentionally <b>not</b> done here —
 /// each test class declares the entities it needs by overriding <c>EventBusTestBase.ProvisionEntitiesAsync</c>.
 /// </remarks>
-public sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsyncDisposable
+internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsyncDisposable
 {
     /// <summary>AMQP port used by <see cref="ServiceBusClient"/> for messaging.</summary>
     private const ushort AmqpPort = 5672;

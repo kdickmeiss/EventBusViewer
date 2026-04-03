@@ -224,7 +224,3 @@ internal abstract class ConsumerTestBase<TEvent> : TestBase
         await Assert.That(deadLettered.DeliveryCount).IsEqualTo(MaxDeliveryCount + 1);
     }
 }
-
-
-
-

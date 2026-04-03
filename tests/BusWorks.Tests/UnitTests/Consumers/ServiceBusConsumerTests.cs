@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
@@ -122,32 +121,22 @@ internal sealed partial class ServiceBusConsumerTests
 
         await Assert.That(exception).IsEqualTo(FaultingConsumer.Error);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
+    
     private static ServiceBusReceivedMessage CreateMessage(BinaryData body, string messageId = "msg-1") =>
         ServiceBusModelFactory.ServiceBusReceivedMessage(body: body, messageId: messageId);
 
     /// <summary>
-    /// Exercises the full framework deserialization and dispatch pipeline by reflecting
-    /// into <c>BuildTypedProcessor&lt;T&gt;</c> — the private static method that wires
-    /// JSON deserialization, <see cref="MessageContext"/> mapping, and <see cref="IConsumer{T}.Consume"/>
-    /// into a single <c>Func&lt;ServiceBusReceivedMessage, CancellationToken, Task&gt;</c>.
+    /// Exercises the full framework deserialization and dispatch pipeline via
+    /// <see cref="ServiceBusMessageProcessorBuilder.BuildTypedProcessor{TMessage}"/>,
+    /// which wires JSON deserialization, <see cref="MessageContext"/> mapping, and
+    /// <see cref="IConsumer{T}.Consume"/> into a single delegate.
     /// </summary>
-    // S3011 — test-only reflection into a private static pure function; no security risk.
-#pragma warning disable S3011
     private static Task InvokeAsync<T>(
         IConsumer<T> consumer,
         ServiceBusReceivedMessage message,
         CancellationToken ct = default) where T : class, IIntegrationEvent
     {
-        var processor = (Func<ServiceBusReceivedMessage, CancellationToken, Task>)
-            typeof(ServiceBusProcessorBackgroundService)
-                .GetMethod("BuildTypedProcessor", BindingFlags.NonPublic | BindingFlags.Static)!
-                .MakeGenericMethod(typeof(T))
-                .Invoke(null, [consumer])!;
-
+        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor = ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
         return processor(message, ct);
     }
-#pragma warning restore S3011
 }

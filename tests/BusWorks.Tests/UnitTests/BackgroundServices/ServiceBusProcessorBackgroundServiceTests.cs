@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Runtime.ExceptionServices;
 using BusWorks.BackgroundServices;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
@@ -230,55 +228,14 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
         await Assert.That(messageType).IsEqualTo(typeof(QueueMessage));
     }
     
-    // ── Reflection helpers ────────────────────────────────────────────────────
-    //
-    // ResolveEndpoint, ValidateSessionContract, and GetConsumerMessageType are private static
-    // methods containing the core startup logic. They are pure functions (Type → result) with
-    // no Azure SDK dependencies, making them ideal unit test targets despite being private.
-    //
-    // S3011 — accessibility bypass is intentional and safe here because:
-    //   • This is test-only code; the suppression never ships to production.
-    //   • The targeted methods are private static pure functions (no instance state, no side
-    //     effects, no Azure SDK calls) — there is no security or encapsulation risk.
-    //   • They are called only with well-known Type arguments defined as fixtures in this file.
-    //   • The alternative (making the methods internal) would widen the production API purely
-    //     for test purposes, which is a worse trade-off than a scoped suppression here.
-#pragma warning disable S3011
+    // These thin wrappers call the public static methods on the extracted helper
+    // classes directly — no reflection needed after the refactoring.
     private static ServiceBusEndpoint InvokeResolveEndpoint(Type consumerType)
-    {
-        MethodInfo method = typeof(ServiceBusProcessorBackgroundService)
-            .GetMethod("ResolveEndpoint", BindingFlags.NonPublic | BindingFlags.Static)!;
-        try
-        {
-            return (ServiceBusEndpoint)method.Invoke(null, [consumerType])!;
-        }
-        catch (TargetInvocationException tie)
-        {
-            ExceptionDispatchInfo.Capture(tie.InnerException!).Throw();
-            throw; // unreachable — satisfies the compiler
-        }
-    }
+        => ServiceBusEndpointResolver.Resolve(consumerType);
 
     private static void InvokeValidateSessionContract(Type consumerType, ServiceBusEndpoint endpoint)
-    {
-        MethodInfo method = typeof(ServiceBusProcessorBackgroundService)
-            .GetMethod("ValidateSessionContract", BindingFlags.NonPublic | BindingFlags.Static)!;
-        try
-        {
-            method.Invoke(null, [consumerType, endpoint]);
-        }
-        catch (TargetInvocationException tie)
-        {
-            ExceptionDispatchInfo.Capture(tie.InnerException!).Throw();
-            throw;
-        }
-    }
+        => ServiceBusConsumerValidator.ValidateSessionContract(consumerType, endpoint);
 
     private static Type? InvokeGetConsumerMessageType(Type consumerType)
-    {
-        MethodInfo method = typeof(ServiceBusProcessorBackgroundService)
-            .GetMethod("GetConsumerMessageType", BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (Type?)method.Invoke(null, [consumerType]);
-    }
-#pragma warning restore S3011
+        => ServiceBusEndpointResolver.GetConsumerMessageType(consumerType);
 }

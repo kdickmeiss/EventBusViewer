@@ -21,7 +21,7 @@ serviceBus.AddServiceBusTopic("parking-ticket-bought")
     .AddServiceBusSubscription("email-notifications");
 
 // On ARM Macs, replace SQL Server with SQL Edge (which supports ARM64)
-if (RuntimeInformation.ProcessArchitecture is (Architecture.Arm64 or Architecture.Arm))
+if (RuntimeInformation.ProcessArchitecture is Architecture.Arm64 or Architecture.Arm)
 {
     // Find the SQL Server container that was just created by RunAsEmulator
     IResource? sqlContainerResource = builder.Resources.FirstOrDefault(r => r.Name == "eventBus-mssql");

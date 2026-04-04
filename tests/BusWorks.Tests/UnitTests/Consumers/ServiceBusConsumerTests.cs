@@ -2,6 +2,7 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
+using BusWorks.Abstractions.Events;
 using BusWorks.BackgroundServices;
 using BusWorks.Consumer;
 

@@ -1,5 +1,6 @@
 ﻿using BusWorks.Abstractions;
 using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Examples.IntegrationEvents;
 

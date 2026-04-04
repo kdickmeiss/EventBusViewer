@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
+using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Consumer;
 

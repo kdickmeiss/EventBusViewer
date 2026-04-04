@@ -4,6 +4,7 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Events;
 using OpenTelemetry.Trace;
 
 namespace BusWorks.Publisher;

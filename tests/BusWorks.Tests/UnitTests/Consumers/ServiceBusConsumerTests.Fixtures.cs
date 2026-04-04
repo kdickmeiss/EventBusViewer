@@ -1,5 +1,6 @@
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
+using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 

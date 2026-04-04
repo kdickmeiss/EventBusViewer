@@ -1,5 +1,6 @@
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
+using BusWorks.Abstractions.Events;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;

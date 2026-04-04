@@ -1,4 +1,5 @@
 ﻿using BusWorks.Abstractions;
+using BusWorks.Abstractions.Events;
 
 namespace BusWorks.BackgroundServices;
 

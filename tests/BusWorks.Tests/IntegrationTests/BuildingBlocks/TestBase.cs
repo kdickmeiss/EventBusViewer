@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using BusWorks.Abstractions;
+using BusWorks.Abstractions.Events;
 using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core.Interfaces;
 

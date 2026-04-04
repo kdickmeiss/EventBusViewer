@@ -1,4 +1,5 @@
 ﻿using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Abstractions;
 
@@ -12,4 +13,3 @@ public interface IEventBusPublisher
     Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
         where TEvent : IIntegrationEvent;
 }
-

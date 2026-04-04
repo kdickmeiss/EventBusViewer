@@ -36,24 +36,18 @@ internal sealed partial class MessagingMenu
 
     private async Task<string> SendMessage(bool forQueue)
     {
-        dynamic @event;
-        if (forQueue)
-        {
-            @event = new ParkingSpotReservedIntegrationEvent(
+        dynamic @event = forQueue
+            ? new ParkingSpotReservedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                "GKL-22-P",
+                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12)))
+            : new ParkingTicketBoughtIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
                 "GKL-22-P",
                 DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12)));
-        }
-        else
-        {
-            @event = new ParkingTicketBoughtIntegrationEvent(
-                Guid.NewGuid(),
-                DateTime.UtcNow,
-                "GKL-22-P",
-                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12)));
-        }
-        
+
         await publisher.PublishAsync(@event);
         return JsonSerializer.Serialize(@event, PrettyPrint);
     }

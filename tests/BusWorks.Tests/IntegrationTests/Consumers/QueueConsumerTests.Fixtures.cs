@@ -2,6 +2,7 @@
 using BusWorks.Abstractions.Attributes;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
+using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
@@ -22,25 +23,21 @@ public sealed partial class QueueConsumerTests
         decimal HourlyRate) : IntegrationEvent(Id, OccurredOnUtc);
 
     /// <summary>
-    /// Test-only consumer that signals a <see cref="TaskCompletionSource{T}"/> once the
-    /// deserialized message has been processed.
+    /// Test consumer that writes every processed event into a <see cref="TestConsumerCapture{T}"/>
+    /// so tests can <c>await</c> the captured result without a per-invocation
+    /// <see cref="System.Threading.Tasks.TaskCompletionSource{T}"/>.
     /// </summary>
     /// <remarks>
-    /// Instantiated directly by the test helpers — <b>not</b> via the DI container or the
-    /// background service. The <see cref="ServiceBusQueueAttribute"/> is declared so the class
-    /// is correctly attributed (matching what production consumers look like) and so the
-    /// consumer-discovery invariant tests continue to pass.
+    /// Resolved from the DI container via <c>ServiceBusMessageProcessorBuilder.Build()</c>
+    /// — the same factory the <c>ServiceBusProcessorBackgroundService</c> uses in production.
     /// </remarks>
     [ServiceBusQueue]
     internal sealed class CapturingParkingReservationConsumer(
-        TaskCompletionSource<ParkingReservationCreatedEvent> completion)
+        TestConsumerCapture<ParkingReservationCreatedEvent> capture)
         : IConsumer<ParkingReservationCreatedEvent>
     {
         public Task Consume(IConsumeContext<ParkingReservationCreatedEvent> context)
-        {
-            completion.TrySetResult(context.Message);
-            return Task.CompletedTask;
-        }
+            => capture.WriteAsync(context.Message).AsTask();
     }
 }
 

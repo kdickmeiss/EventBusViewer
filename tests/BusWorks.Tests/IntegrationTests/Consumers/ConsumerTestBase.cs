@@ -1,6 +1,8 @@
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions.Events;
+using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -15,8 +17,8 @@ namespace BusWorks.Tests.IntegrationTests.Consumers;
 ///   <item>Provisioning the broker entities (override <see cref="TestBase.InitializeAsync"/>).</item>
 ///   <item>Supplying a fresh test event (<see cref="NewEvent"/>).</item>
 ///   <item>Returning correctly-configured <see cref="ServiceBusReceiver"/> instances.</item>
-///   <item>Implementing the publish-and-consume round-trip (<see cref="PublishAndConsumeAsync"/>).</item>
-///   <item>Asserting the deserialized event's domain properties (<see cref="AssertDeserializedEventAsync"/>).</item>
+///   <item>Providing the concrete consumer type (<see cref="ConsumerType"/>).</item>
+///   <item>Asserting the deserialized event's domain properties (<see cref="AssertDeserializedEvent"/>).</item>
 ///   <item>Optionally draining stale messages before a test (<see cref="DrainAsync"/>).</item>
 /// </list>
 /// </para>
@@ -33,6 +35,14 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
     protected abstract TEvent NewEvent();
 
     /// <summary>
+    /// The concrete consumer type that handles <typeparamref name="TEvent"/>.
+    /// Used by <see cref="PublishAndConsumeAsync"/> to mirror the background service's
+    /// <c>ServiceBusMessageProcessorBuilder.Build(consumerType)</c> dispatch path exactly,
+    /// including DI scope creation and consumer resolution.
+    /// </summary>
+    protected abstract Type ConsumerType { get; }
+
+    /// <summary>
     /// Publishes <paramref name="event"/> and returns the raw broker message,
     /// consuming it with <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/>.
     /// Implementations are responsible for draining stale messages before opening
@@ -46,8 +56,35 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
     /// deserialization pipeline, returning the fully-typed domain event exactly as a production
     /// consumer would receive it.
     /// </summary>
-    protected abstract Task<TEvent> PublishAndConsumeAsync(
-        TEvent @event, CancellationToken cancellationToken = default);
+    /// <remarks>
+    /// Mirrors the <c>ServiceBusProcessorBackgroundService</c> dispatch loop exactly:
+    /// <list type="number">
+    ///   <item>Receives the raw message via <see cref="PublishAndReceiveRawAsync"/>.</item>
+    ///   <item>Opens a fresh DI scope (one per message, same as production).</item>
+    ///   <item>
+    ///     Resolves the consumer from that scope using
+    ///     <c>ServiceBusMessageProcessorBuilder.Build(<see cref="ConsumerType"/>)</c>
+    ///     — the identical reflective factory the background service pre-builds at startup.
+    ///   </item>
+    ///   <item>Awaits the captured event from <see cref="TestConsumerCapture{TEvent}"/>.</item>
+    /// </list>
+    /// </remarks>
+    protected virtual async Task<TEvent> PublishAndConsumeAsync(
+        TEvent @event,
+        CancellationToken cancellationToken = default)
+    {
+        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, cancellationToken);
+
+        // Mirror the background service: create a DI scope per message, resolve the consumer
+        // from that scope, and dispatch through the same factory the background service uses.
+        using IServiceScope scope = GetRequiredService<IServiceScopeFactory>().CreateScope();
+        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory =
+            ServiceBusMessageProcessorBuilder.Build(ConsumerType);
+        await processorFactory(scope.ServiceProvider)(raw, cancellationToken);
+
+        return await GetRequiredService<TestConsumerCapture<TEvent>>()
+            .ReadAsync(ReceiveTimeout, cancellationToken);
+    }
 
     /// <summary>
     /// Creates a <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/> receiver

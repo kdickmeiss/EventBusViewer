@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -18,6 +19,9 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
 
     protected override ParkingReservationCreatedEvent NewEvent() =>
         new(Guid.NewGuid(), DateTime.UtcNow, "A-12", "usr_7f8b91c2", 3.50m);
+
+    /// <inheritdoc />
+    protected override Type ConsumerType => typeof(CapturingParkingReservationConsumer);
 
     /// <inheritdoc />
     /// <remarks>
@@ -39,24 +43,6 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
             $"No message arrived on queue '{QueueName}' within {ReceiveTimeout.TotalSeconds} s.");
     }
 
-    protected override async Task<ParkingReservationCreatedEvent> PublishAndConsumeAsync(
-        ParkingReservationCreatedEvent @event,
-        CancellationToken cancellationToken = default)
-    {
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, cancellationToken);
-
-        var tcs = new TaskCompletionSource<ParkingReservationCreatedEvent>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        // Instantiate the consumer directly — bypasses DI/background service but exercises
-        // the real BuildTypedProcessor<T> deserialization and MessageContext mapping path.
-        var consumer = new CapturingParkingReservationConsumer(tcs);
-        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
-            ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
-        await processor(raw, cancellationToken);
-
-        return await tcs.Task;
-    }
 
     protected override ServiceBusReceiver CreateDeleteReceiver() =>
         Emulator.Client.CreateReceiver(
@@ -116,19 +102,21 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
             QueueName,
             new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
 
-        // Act
-        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(
+            ReceiveTimeout, TestContext.Current.CancellationToken);
 
         raw.ShouldNotBeNull();
 
-        var tcs = new TaskCompletionSource<ParkingReservationCreatedEvent>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var consumer = new CapturingParkingReservationConsumer(tcs);
-        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
-            ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
-        await processor(raw, CancellationToken.None);
+        // Act — mirror the background service: create a DI scope, resolve the consumer from it,
+        // and dispatch through the same Build() factory the background service pre-builds at startup.
+        using IServiceScope scope = GetRequiredService<IServiceScopeFactory>().CreateScope();
+        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory =
+            ServiceBusMessageProcessorBuilder.Build(typeof(CapturingParkingReservationConsumer));
+        await processorFactory(scope.ServiceProvider)(raw, TestContext.Current.CancellationToken);
 
-        ParkingReservationCreatedEvent received = await tcs.Task;
+        ParkingReservationCreatedEvent received =
+            await GetRequiredService<TestConsumerCapture<ParkingReservationCreatedEvent>>()
+                .ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
         // Assert
         received.Id.ShouldBe(expectedId);

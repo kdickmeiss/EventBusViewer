@@ -49,13 +49,28 @@ public sealed class EventBusHostFactory : IAsyncLifetime
                 services.Configure<BusWorksOptions>(
                     context.Configuration.GetSection(BusWorksOptions.SectionName));
 
+                // Discover consumers from the test assembly — the same registry the background
+                // service uses at runtime.
+                var registry = new ServiceBusAssemblyRegistry(typeof(EventBusHostFactory).Assembly);
+
                 services
                     // Reuse the same ServiceBusClient that the emulator fixture owns so
                     // there is exactly one AMQP connection shared across the whole session.
                     .AddSingleton(Emulator.Client)
-                    .AddSingleton(new ServiceBusAssemblyRegistry(typeof(EventBusHostFactory).Assembly))
+                    .AddSingleton(registry)
                     .AddHostedService<ServiceBusProcessorBackgroundService>()
                     .AddSingleton<IEventBusPublisher, ServiceBusPublisher>();
+
+                // Register each discovered consumer as scoped — identical to what
+                // DependencyInjection.AddBusWorksCore does in production so that
+                // ServiceBusMessageProcessorBuilder.Build() can resolve them from a DI scope.
+                foreach (Type consumerType in registry.GetConsumerTypes())
+                    services.AddScoped(consumerType);
+
+                // Open-generic singleton registration: one TestConsumerCapture<T> instance is
+                // created per concrete event type on first resolution (e.g.
+                // TestConsumerCapture<ParkingReservationCreatedEvent>).
+                services.AddSingleton(typeof(TestConsumerCapture<>), typeof(TestConsumerCapture<>));
 
                 // Mirror the real Program.cs pattern:
                 //   .AddSingleton(TracerProvider.Default.GetTracer(builder.Environment.ApplicationName))

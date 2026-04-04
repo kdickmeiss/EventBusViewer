@@ -1,5 +1,4 @@
 ﻿using Azure.Messaging.ServiceBus;
-using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 using Shouldly;
 using Xunit;
@@ -33,6 +32,9 @@ public sealed partial class TopicConsumerTests
         new(Guid.NewGuid(), DateTime.UtcNow, "B-07", "Available", "lot_north_a3");
 
     /// <inheritdoc />
+    protected override Type ConsumerType => typeof(CapturingParkingSpotConsumer);
+
+    /// <inheritdoc />
     /// <remarks>
     /// Drains both subscriptions before opening the receiver so that neither stale
     /// fan-out copies nor leftover messages from previous tests pollute the result.
@@ -56,24 +58,6 @@ public sealed partial class TopicConsumerTests
             $"within {ReceiveTimeout.TotalSeconds} s.");
     }
 
-    protected override async Task<ParkingSpotStatusChangedEvent> PublishAndConsumeAsync(
-        ParkingSpotStatusChangedEvent @event,
-        CancellationToken cancellationToken = default)
-    {
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, cancellationToken);
-
-        var tcs = new TaskCompletionSource<ParkingSpotStatusChangedEvent>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        // Instantiate directly — exercises the real BuildTypedProcessor<T> deserialization
-        // and MessageContext mapping path.
-        var consumer = new CapturingParkingSpotConsumer(tcs);
-        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
-            ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
-        await processor(raw, cancellationToken);
-
-        return await tcs.Task;
-    }
 
     protected override ServiceBusReceiver CreateDeleteReceiver() =>
         Emulator.Client.CreateReceiver(

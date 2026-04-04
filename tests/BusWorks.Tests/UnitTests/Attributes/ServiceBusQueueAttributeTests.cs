@@ -1,4 +1,5 @@
 using BusWorks.Abstractions.Attributes;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Attributes;
@@ -24,13 +25,11 @@ public sealed class ServiceBusQueueAttributeTests{
     [Fact]
     public void DefaultConstructor_Defaults_AreCorrect()
     {
-        // QueueName being null is meaningful — it signals that the queue name should
-        // be resolved from [QueueRoute] on the message type at runtime.
         var attr = new ServiceBusQueueAttribute();
 
-        Assert.Null(attr.QueueName);
-        Assert.False(attr.RequireSession);
-        Assert.Equal(5, attr.MaxDeliveryCount);
+        attr.QueueName.ShouldBeNull();
+        attr.RequireSession.ShouldBeFalse();
+        attr.MaxDeliveryCount.ShouldBe(5);
     }
     
     [Fact]
@@ -41,7 +40,7 @@ public sealed class ServiceBusQueueAttributeTests{
 
         var attr = new ServiceBusQueueAttribute(name);
 
-        Assert.Equal(name, attr.QueueName);
+        attr.QueueName.ShouldBe(name);
     }
     
     [Fact]
@@ -49,7 +48,7 @@ public sealed class ServiceBusQueueAttributeTests{
     {
         var attr = new ServiceBusQueueAttribute { MaxDeliveryCount = 0 };
 
-        Assert.Equal(0, attr.MaxDeliveryCount);
+        attr.MaxDeliveryCount.ShouldBe(0);
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public sealed class ServiceBusQueueAttributeTests{
         // That validation is the responsibility of ServiceBusProcessorBackgroundService.ResolveEndpoint.
         var attr = new ServiceBusQueueAttribute { MaxDeliveryCount = -1 };
 
-        Assert.Equal(-1, attr.MaxDeliveryCount);
+        attr.MaxDeliveryCount.ShouldBe(-1);
     }
 
     [Fact]
@@ -71,9 +70,9 @@ public sealed class ServiceBusQueueAttributeTests{
             RequireSession = true
         };
 
-        Assert.Equal("override-queue", attr.QueueName);
-        Assert.Equal(10, attr.MaxDeliveryCount);
-        Assert.True(attr.RequireSession);
+        attr.QueueName.ShouldBe("override-queue");
+        attr.MaxDeliveryCount.ShouldBe(10);
+        attr.RequireSession.ShouldBeTrue();
     }
     
     [Fact]
@@ -81,9 +80,9 @@ public sealed class ServiceBusQueueAttributeTests{
     {
         AttributeUsageAttribute usage = GetAttributeUsage(typeof(ServiceBusQueueAttribute));
 
-        Assert.Equal(AttributeTargets.Class, usage.ValidOn);
-        Assert.False(usage.Inherited);
-        Assert.False(usage.AllowMultiple);
+        usage.ValidOn.ShouldBe(AttributeTargets.Class);
+        usage.Inherited.ShouldBeFalse();
+        usage.AllowMultiple.ShouldBeFalse();
     }
     
     [Fact]
@@ -94,8 +93,8 @@ public sealed class ServiceBusQueueAttributeTests{
             .Cast<ServiceBusQueueAttribute>()
             .SingleOrDefault();
 
-        Assert.NotNull(attr);
-        Assert.Null(attr.QueueName);
+        attr.ShouldNotBeNull();
+        attr.QueueName.ShouldBeNull();
     }
 
     [Fact]
@@ -106,7 +105,7 @@ public sealed class ServiceBusQueueAttributeTests{
             .Cast<ServiceBusQueueAttribute>()
             .Single();
 
-        Assert.Equal("explicit-queue", attr.QueueName);
+        attr.QueueName.ShouldBe("explicit-queue");
     }
 
     [Fact]
@@ -117,8 +116,8 @@ public sealed class ServiceBusQueueAttributeTests{
             .Cast<ServiceBusQueueAttribute>()
             .Single();
 
-        Assert.True(attr.RequireSession);
-        Assert.Equal(3, attr.MaxDeliveryCount);
+        attr.RequireSession.ShouldBeTrue();
+        attr.MaxDeliveryCount.ShouldBe(3);
     }
 
     [Fact]
@@ -129,7 +128,7 @@ public sealed class ServiceBusQueueAttributeTests{
             .Cast<ServiceBusQueueAttribute>()
             .SingleOrDefault();
 
-        Assert.Null(attr);
+        attr.ShouldBeNull();
     }
     
     [Fact]
@@ -140,7 +139,7 @@ public sealed class ServiceBusQueueAttributeTests{
             .Cast<QueueRouteAttribute>()
             .Single();
 
-        Assert.Equal("sample-event-queue", routeAttr.QueueName);
+        routeAttr.QueueName.ShouldBe("sample-event-queue");
     }
 
     [Fact]
@@ -148,9 +147,9 @@ public sealed class ServiceBusQueueAttributeTests{
     {
         AttributeUsageAttribute usage = GetAttributeUsage(typeof(QueueRouteAttribute));
 
-        Assert.Equal(AttributeTargets.Class, usage.ValidOn);
-        Assert.False(usage.Inherited);
-        Assert.False(usage.AllowMultiple);
+        usage.ValidOn.ShouldBe(AttributeTargets.Class);
+        usage.Inherited.ShouldBeFalse();
+        usage.AllowMultiple.ShouldBeFalse();
     }
     
     private static AttributeUsageAttribute GetAttributeUsage(Type attributeType) =>

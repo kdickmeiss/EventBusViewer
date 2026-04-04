@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
@@ -21,14 +22,13 @@ public sealed partial class TopicConsumerTests
 
     public TopicConsumerTests(EventBusHostFactory factory) : base(factory) { }
 
-    protected override async Task ProvisionEntitiesAsync()
+    public override async ValueTask InitializeAsync()
     {
         await EnsureTopicExistsAsync(TopicName);
         await EnsureSubscriptionExistsAsync(TopicName, SubscriptionName, o => o.MaxDeliveryCount = MaxDeliveryCount);
         await EnsureSubscriptionExistsAsync(TopicName, FanOutSubscriptionName);
     }
-
-
+    
     protected override ParkingSpotStatusChangedEvent NewEvent() =>
         new(Guid.NewGuid(), DateTime.UtcNow, "B-07", "Available", "lot_north_a3");
 
@@ -101,12 +101,12 @@ public sealed partial class TopicConsumerTests
         ParkingSpotStatusChangedEvent expected,
         ParkingSpotStatusChangedEvent received)
     {
-        await Task.CompletedTask; // keep async for interface compatibility
-        Assert.Equal(expected.Id, received.Id);
-        Assert.Equal(expected.OccurredOnUtc, received.OccurredOnUtc);
-        Assert.Equal(expected.SpotCode, received.SpotCode);
-        Assert.Equal(expected.Status, received.Status);
-        Assert.Equal(expected.ParkingLotId, received.ParkingLotId);
+        await Task.CompletedTask;
+        received.Id.ShouldBe(expected.Id);
+        received.OccurredOnUtc.ShouldBe(expected.OccurredOnUtc);
+        received.SpotCode.ShouldBe(expected.SpotCode);
+        received.Status.ShouldBe(expected.Status);
+        received.ParkingLotId.ShouldBe(expected.ParkingLotId);
     }
 
     /// <summary>
@@ -169,9 +169,9 @@ public sealed partial class TopicConsumerTests
             await fanOutReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
         // Assert — both subscriptions received an independent copy of the same message.
-        Assert.NotNull(fromPrimary);
-        Assert.NotNull(fromFanOut);
-        Assert.Equal(@event.Id.ToString(), fromPrimary.MessageId);
-        Assert.Equal(@event.Id.ToString(), fromFanOut.MessageId);
+        fromPrimary.ShouldNotBeNull();
+        fromFanOut.ShouldNotBeNull();
+        fromPrimary.MessageId.ShouldBe(@event.Id.ToString());
+        fromFanOut.MessageId.ShouldBe(@event.Id.ToString());
     }
 }

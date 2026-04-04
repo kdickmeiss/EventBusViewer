@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions.Events;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
@@ -11,7 +12,7 @@ namespace BusWorks.Tests.IntegrationTests.Consumers;
 /// <para>
 /// Concrete subclasses are responsible for:
 /// <list type="bullet">
-///   <item>Provisioning the broker entities (<see cref="TestBase.ProvisionEntitiesAsync"/>).</item>
+///   <item>Provisioning the broker entities (override <see cref="TestBase.InitializeAsync"/>).</item>
 ///   <item>Supplying a fresh test event (<see cref="NewEvent"/>).</item>
 ///   <item>Returning correctly-configured <see cref="ServiceBusReceiver"/> instances.</item>
 ///   <item>Implementing the publish-and-consume round-trip (<see cref="PublishAndConsumeAsync"/>).</item>
@@ -87,7 +88,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(raw);
+        raw.ShouldNotBeNull();
     }
 
     [Fact]
@@ -115,12 +116,12 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
             received.AddRange(batch);
         }
 
-        Assert.Equal(messageCount, received.Count);
+        received.Count.ShouldBe(messageCount);
 
         var receivedIds = received.Select(m => Guid.Parse(m.MessageId)).ToHashSet();
 
         foreach (TEvent e in published)
-            Assert.Contains(e.Id, receivedIds);
+            receivedIds.ShouldContain(e.Id);
     }
 
     [Fact]
@@ -130,7 +131,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
 
-        Assert.Equal("application/json", raw.ContentType);
+        raw.ContentType.ShouldBe("application/json");
     }
 
     [Fact]
@@ -140,7 +141,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
 
-        Assert.Equal(@event.Id.ToString(), raw.MessageId);
+        raw.MessageId.ShouldBe(@event.Id.ToString());
     }
 
     [Fact]
@@ -150,7 +151,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
 
-        Assert.Equal(@event.Id.ToString(), raw.CorrelationId);
+        raw.CorrelationId.ShouldBe(@event.Id.ToString());
     }
 
     [Fact]
@@ -173,16 +174,16 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
         await PublishAsync(NewEvent(), TestContext.Current.CancellationToken);
 
         ServiceBusReceivedMessage? firstDelivery = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
-        Assert.NotNull(firstDelivery);
+        firstDelivery.ShouldNotBeNull();
 
         // Simulate a transient failure — abandoning returns the message to the active entity.
         await receiver.AbandonMessageAsync(firstDelivery, cancellationToken: TestContext.Current.CancellationToken);
 
         ServiceBusReceivedMessage? retryDelivery = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(retryDelivery);
-        Assert.Equal(2, retryDelivery.DeliveryCount);
-        Assert.Equal(firstDelivery.MessageId, retryDelivery.MessageId);
+        retryDelivery.ShouldNotBeNull();
+        retryDelivery.DeliveryCount.ShouldBe(2);
+        retryDelivery.MessageId.ShouldBe(firstDelivery.MessageId);
 
         // Cleanup — complete the retry delivery to leave the entity clean.
         await receiver.CompleteMessageAsync(retryDelivery, TestContext.Current.CancellationToken);
@@ -204,8 +205,8 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
         {
             ServiceBusReceivedMessage? message = await activeReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-            Assert.NotNull(message);
-            Assert.Equal(delivery, message.DeliveryCount);
+            message.ShouldNotBeNull();
+            message.DeliveryCount.ShouldBe(delivery);
 
             await activeReceiver.AbandonMessageAsync(message, cancellationToken: TestContext.Current.CancellationToken);
         }
@@ -214,7 +215,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
         ServiceBusReceivedMessage? shouldBeNull =
             await activeReceiver.ReceiveMessageAsync(maxWaitTime: TimeSpan.FromSeconds(3), cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Null(shouldBeNull);
+        shouldBeNull.ShouldBeNull();
 
         // The message should be present in the dead-letter sub-queue.
         // The DLQ sub-queue is provisioned automatically by the broker alongside the parent entity.
@@ -222,8 +223,8 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         ServiceBusReceivedMessage? deadLettered = await dlqReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(deadLettered);
-        Assert.Equal(@event.Id.ToString(), deadLettered.MessageId);
-        Assert.Equal(MaxDeliveryCount + 1, deadLettered.DeliveryCount);
+        deadLettered.ShouldNotBeNull();
+        deadLettered.MessageId.ShouldBe(@event.Id.ToString());
+        deadLettered.DeliveryCount.ShouldBe(MaxDeliveryCount + 1);
     }
 }

@@ -1,4 +1,5 @@
 using BusWorks.BackgroundServices;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
@@ -10,10 +11,10 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("my-queue");
 
-        Assert.Equal("my-queue", endpoint.QueueOrTopicName);
-        Assert.Null(endpoint.SubscriptionName);
-        Assert.False(endpoint.RequireSession);
-        Assert.Equal(5, endpoint.MaxDeliveryCount);
+        endpoint.QueueOrTopicName.ShouldBe("my-queue");
+        endpoint.SubscriptionName.ShouldBeNull();
+        endpoint.RequireSession.ShouldBeFalse();
+        endpoint.MaxDeliveryCount.ShouldBe(5);
     }
 
     [Fact]
@@ -22,10 +23,10 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
         ServiceBusEndpoint queue = new("my-queue");
         ServiceBusEndpoint topic = new("my-topic", SubscriptionName: "my-sub");
 
-        Assert.True(queue.IsQueue);
-        Assert.False(queue.IsTopic);
-        Assert.False(topic.IsQueue);
-        Assert.True(topic.IsTopic);
+        queue.IsQueue.ShouldBeTrue();
+        queue.IsTopic.ShouldBeFalse();
+        topic.IsQueue.ShouldBeFalse();
+        topic.IsTopic.ShouldBeTrue();
     }
 
     [Fact]
@@ -33,9 +34,9 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(ExplicitQueueConsumer));
 
-        Assert.Equal("explicit-queue", endpoint.QueueOrTopicName);
-        Assert.True(endpoint.IsQueue);
-        Assert.Null(endpoint.SubscriptionName);
+        endpoint.QueueOrTopicName.ShouldBe("explicit-queue");
+        endpoint.IsQueue.ShouldBeTrue();
+        endpoint.SubscriptionName.ShouldBeNull();
     }
 
     [Fact]
@@ -43,8 +44,8 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(ImplicitQueueConsumer));
 
-        Assert.Equal("order-queue", endpoint.QueueOrTopicName);
-        Assert.True(endpoint.IsQueue);
+        endpoint.QueueOrTopicName.ShouldBe("order-queue");
+        endpoint.IsQueue.ShouldBeTrue();
     }
 
     [Fact]
@@ -52,42 +53,30 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(SessionQueueConsumer));
 
-        Assert.Equal("session-queue", endpoint.QueueOrTopicName);
-        Assert.True(endpoint.RequireSession);
-        Assert.Equal(3, endpoint.MaxDeliveryCount);
+        endpoint.QueueOrTopicName.ShouldBe("session-queue");
+        endpoint.RequireSession.ShouldBeTrue();
+        endpoint.MaxDeliveryCount.ShouldBe(3);
     }
 
     [Fact]
     public void ResolveEndpoint_QueueConsumer_NegativeMaxDeliveryCount_Throws()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(NegativeDeliveryCountQueueConsumer)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(NegativeDeliveryCountQueueConsumer), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(NegativeDeliveryCountQueueConsumer)))
+            .Message.ShouldContain(nameof(NegativeDeliveryCountQueueConsumer));
     }
 
     [Fact]
     public void ResolveEndpoint_QueueConsumer_MessageTypeHasTopicRoute_Throws()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(QueueConsumerWithTopicMessage)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(QueueConsumerWithTopicMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(QueueConsumerWithTopicMessage)))
+            .Message.ShouldContain(nameof(QueueConsumerWithTopicMessage));
     }
 
     [Fact]
     public void ResolveEndpoint_QueueConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(QueueConsumerWithUnroutedMessage)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(QueueConsumerWithUnroutedMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(QueueConsumerWithUnroutedMessage)))
+            .Message.ShouldContain(nameof(QueueConsumerWithUnroutedMessage));
     }
 
     [Fact]
@@ -95,53 +84,37 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(TopicConsumer));
 
-        Assert.Equal("park-events", endpoint.QueueOrTopicName);
-        Assert.Equal("resort-subscription", endpoint.SubscriptionName);
-        Assert.True(endpoint.IsTopic);
+        endpoint.QueueOrTopicName.ShouldBe("park-events");
+        endpoint.SubscriptionName.ShouldBe("resort-subscription");
+        endpoint.IsTopic.ShouldBeTrue();
     }
 
     [Fact]
     public void ResolveEndpoint_TopicConsumer_NegativeMaxDeliveryCount_ThrowsInvalidOperationException()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(NegativeDeliveryCountTopicConsumer)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(NegativeDeliveryCountTopicConsumer), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(NegativeDeliveryCountTopicConsumer)))
+            .Message.ShouldContain(nameof(NegativeDeliveryCountTopicConsumer));
     }
 
     [Fact]
     public void ResolveEndpoint_TopicConsumer_MessageTypeHasQueueRoute_ThrowsInvalidOperationException()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(TopicConsumerWithQueueMessage)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(TopicConsumerWithQueueMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(TopicConsumerWithQueueMessage)))
+            .Message.ShouldContain(nameof(TopicConsumerWithQueueMessage));
     }
 
     [Fact]
     public void ResolveEndpoint_TopicConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(TopicConsumerWithUnroutedMessage)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(TopicConsumerWithUnroutedMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(TopicConsumerWithUnroutedMessage)))
+            .Message.ShouldContain(nameof(TopicConsumerWithUnroutedMessage));
     }
 
     [Fact]
     public void ResolveEndpoint_ConsumerWithNoRoutingAttribute_ThrowsInvalidOperationException()
     {
-        InvalidOperationException? exception = null;
-        try { InvokeResolveEndpoint(typeof(UnattributedConsumer)); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(UnattributedConsumer), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(UnattributedConsumer)))
+            .Message.ShouldContain(nameof(UnattributedConsumer));
     }
 
     [Fact]
@@ -149,11 +122,7 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("session-queue", RequireSession: true);
 
-        InvalidOperationException? exception = null;
-        try { InvokeValidateSessionContract(typeof(SessionQueueConsumer), endpoint); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.Null(exception);
+        Should.NotThrow(() => InvokeValidateSessionContract(typeof(SessionQueueConsumer), endpoint));
     }
 
     [Fact]
@@ -161,11 +130,7 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("order-queue", RequireSession: false);
 
-        InvalidOperationException? exception = null;
-        try { InvokeValidateSessionContract(typeof(ImplicitQueueConsumer), endpoint); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.Null(exception);
+        Should.NotThrow(() => InvokeValidateSessionContract(typeof(ImplicitQueueConsumer), endpoint));
     }
 
     [Fact]
@@ -173,12 +138,8 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("order-queue", RequireSession: true);
 
-        InvalidOperationException? exception = null;
-        try { InvokeValidateSessionContract(typeof(SessionConsumerForNonSessionedMessage), endpoint); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(SessionConsumerForNonSessionedMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeValidateSessionContract(typeof(SessionConsumerForNonSessionedMessage), endpoint))
+            .Message.ShouldContain(nameof(SessionConsumerForNonSessionedMessage));
     }
 
     [Fact]
@@ -186,12 +147,8 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("session-queue", RequireSession: false);
 
-        InvalidOperationException? exception = null;
-        try { InvokeValidateSessionContract(typeof(NonSessionConsumerForSessionedMessage), endpoint); }
-        catch (InvalidOperationException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
-        Assert.Contains(nameof(SessionMessage), exception.Message);
+        Should.Throw<InvalidOperationException>(() => InvokeValidateSessionContract(typeof(NonSessionConsumerForSessionedMessage), endpoint))
+            .Message.ShouldContain(nameof(SessionMessage));
     }
 
     [Fact]
@@ -199,7 +156,7 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         Type? messageType = InvokeGetConsumerMessageType(typeof(ImplicitQueueConsumer));
 
-        Assert.Equal(typeof(QueueMessage), messageType);
+        messageType.ShouldBe(typeof(QueueMessage));
     }
 
     [Fact]
@@ -207,7 +164,7 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         Type? messageType = InvokeGetConsumerMessageType(typeof(DeeplyNestedConsumer));
 
-        Assert.Equal(typeof(QueueMessage), messageType);
+        messageType.ShouldBe(typeof(QueueMessage));
     }
 
     // These thin wrappers call the public static methods on the extracted helper

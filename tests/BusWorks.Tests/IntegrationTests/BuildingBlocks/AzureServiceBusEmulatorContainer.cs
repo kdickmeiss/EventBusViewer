@@ -25,8 +25,6 @@ public sealed class AzureServiceBusEmulatorContainer{
 
     private readonly ServiceBusContainer _container;
 
-    private ServiceBusAdministrationClient _adminClient = null!;
-
     /// <summary>
     /// Connection string for the AMQP endpoint.
     /// Use this to construct a <see cref="ServiceBusClient"/> for send / receive operations.
@@ -44,8 +42,8 @@ public sealed class AzureServiceBusEmulatorContainer{
     /// Test classes obtain this via the <c>EventBusTestBase</c> helper methods —
     /// call it directly only when you need low-level control over entity options.
     /// </summary>
-    public ServiceBusAdministrationClient AdminClient => _adminClient;
-    
+    public ServiceBusAdministrationClient AdminClient { get; private set; } = null!;
+
     public AzureServiceBusEmulatorContainer()
     {
         // 1. Create a network for the SQL Edge container
@@ -101,7 +99,7 @@ public sealed class AzureServiceBusEmulatorContainer{
             "UseDevelopmentEmulator=true;";
 
         Client = new ServiceBusClient(ConnectionString);
-        _adminClient = new ServiceBusAdministrationClient(adminConnectionString);
+        AdminClient = new ServiceBusAdministrationClient(adminConnectionString);
     }
     
     public async ValueTask DisposeAsync()

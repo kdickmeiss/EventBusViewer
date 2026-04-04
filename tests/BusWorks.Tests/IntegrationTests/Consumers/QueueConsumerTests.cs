@@ -1,18 +1,17 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-public sealed partial class QueueConsumerTests
-    : ConsumerTestBase<QueueConsumerTests.ParkingReservationCreatedEvent>
+public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
+    : ConsumerTestBase<QueueConsumerTests.ParkingReservationCreatedEvent>(factory)
 {
     private const string QueueName = "parking-reservation-created";
 
-    public QueueConsumerTests(EventBusHostFactory factory) : base(factory) { }
-
-    protected override async Task ProvisionEntitiesAsync()
+    public override async ValueTask InitializeAsync()
     {
         await EnsureQueueExistsAsync(QueueName, o => o.MaxDeliveryCount = MaxDeliveryCount);
     }
@@ -82,12 +81,12 @@ public sealed partial class QueueConsumerTests
         ParkingReservationCreatedEvent expected,
         ParkingReservationCreatedEvent received)
     {
-        await Task.CompletedTask; // keep the method async for interface compatibility
-        Assert.Equal(expected.Id, received.Id);
-        Assert.Equal(expected.OccurredOnUtc, received.OccurredOnUtc);
-        Assert.Equal(expected.SpotCode, received.SpotCode);
-        Assert.Equal(expected.UserId, received.UserId);
-        Assert.Equal(expected.HourlyRate, received.HourlyRate);
+        await Task.CompletedTask;
+        received.Id.ShouldBe(expected.Id);
+        received.OccurredOnUtc.ShouldBe(expected.OccurredOnUtc);
+        received.SpotCode.ShouldBe(expected.SpotCode);
+        received.UserId.ShouldBe(expected.UserId);
+        received.HourlyRate.ShouldBe(expected.HourlyRate);
     }
 
     [Fact]
@@ -121,7 +120,7 @@ public sealed partial class QueueConsumerTests
         // Act
         ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(raw);
+        raw.ShouldNotBeNull();
 
         var tcs = new TaskCompletionSource<ParkingReservationCreatedEvent>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -133,9 +132,9 @@ public sealed partial class QueueConsumerTests
         ParkingReservationCreatedEvent received = await tcs.Task;
 
         // Assert
-        Assert.Equal(expectedId, received.Id);
-        Assert.Equal("B-07", received.SpotCode);
-        Assert.Equal("usr_casetest", received.UserId);
-        Assert.Equal(5.00m, received.HourlyRate);
+        received.Id.ShouldBe(expectedId);
+        received.SpotCode.ShouldBe("B-07");
+        received.UserId.ShouldBe("usr_casetest");
+        received.HourlyRate.ShouldBe(5.00m);
     }
 }

@@ -1,4 +1,5 @@
 using BusWorks.Options;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Options;
@@ -10,14 +11,14 @@ public class BusWorksOptionsTests
     {
         var options = new BusWorksOptions();
 
-        Assert.Equal(EventBusAuthenticationType.ConnectionString, options.AuthenticationType);
-        Assert.Null(options.ConnectionString);
-        Assert.Null(options.ManagedIdentity);
-        Assert.Null(options.ApplicationRegistration);
-        Assert.Null(options.AzureCli);
-        Assert.Equal(10, options.MaxConcurrentCalls);
-        Assert.Equal(8, options.MaxConcurrentSessions);
-        Assert.Equal(1, options.MaxConcurrentCallsPerSession);
+        options.AuthenticationType.ShouldBe(EventBusAuthenticationType.ConnectionString);
+        options.ConnectionString.ShouldBeNull();
+        options.ManagedIdentity.ShouldBeNull();
+        options.ApplicationRegistration.ShouldBeNull();
+        options.AzureCli.ShouldBeNull();
+        options.MaxConcurrentCalls.ShouldBe(10);
+        options.MaxConcurrentSessions.ShouldBe(8);
+        options.MaxConcurrentCallsPerSession.ShouldBe(1);
     }
 
     [Theory]
@@ -28,7 +29,7 @@ public class BusWorksOptionsTests
     {
         var options = new BusWorksOptions { AuthenticationType = authenticationType };
 
-        Assert.Equal(authenticationType, options.AuthenticationType);
+        options.AuthenticationType.ShouldBe(authenticationType);
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public class BusWorksOptionsTests
     {
         var options = new BusWorksOptions { MaxConcurrentCalls = 20 };
 
-        Assert.Equal(20, options.MaxConcurrentCalls);
+        options.MaxConcurrentCalls.ShouldBe(20);
     }
 
     [Fact]
@@ -44,7 +45,7 @@ public class BusWorksOptionsTests
     {
         var options = new BusWorksOptions { MaxConcurrentSessions = 16 };
 
-        Assert.Equal(16, options.MaxConcurrentSessions);
+        options.MaxConcurrentSessions.ShouldBe(16);
     }
 
     [Fact]
@@ -52,7 +53,7 @@ public class BusWorksOptionsTests
     {
         var options = new BusWorksOptions { MaxConcurrentCallsPerSession = 2 };
 
-        Assert.Equal(2, options.MaxConcurrentCallsPerSession);
+        options.MaxConcurrentCallsPerSession.ShouldBe(2);
     }
 
     [Theory]
@@ -64,7 +65,7 @@ public class BusWorksOptionsTests
     {
         int value = (int)authenticationType;
 
-        Assert.Equal(expectedValue, value);
+        value.ShouldBe(expectedValue);
     }
 
     [Fact]
@@ -72,7 +73,7 @@ public class BusWorksOptionsTests
     {
         int count = Enum.GetValues<EventBusAuthenticationType>().Length;
 
-        Assert.Equal(4, count);
+        count.ShouldBe(4);
     }
 
     [Fact]
@@ -80,17 +81,16 @@ public class BusWorksOptionsTests
     {
         var options = new ConnectionStringOptions();
 
-        Assert.Equal(string.Empty, options.ConnectionString);
+        options.ConnectionString.ShouldBe(string.Empty);
     }
 
     [Fact]
     public void ConnectionStringOptions_ConnectionString_CanBeSet()
     {
         const string value = "Endpoint=sb://my-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123";
-
         var options = new ConnectionStringOptions { ConnectionString = value };
 
-        Assert.Equal(value, options.ConnectionString);
+        options.ConnectionString.ShouldBe(value);
     }
 
     [Fact]
@@ -98,8 +98,8 @@ public class BusWorksOptionsTests
     {
         var options = new ManagedIdentityOptions();
 
-        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
-        Assert.Null(options.ClientId);
+        options.FullyQualifiedNamespace.ShouldBe(string.Empty);
+        options.ClientId.ShouldBeNull();
     }
 
     [Fact]
@@ -111,8 +111,8 @@ public class BusWorksOptionsTests
             ClientId = "00000000-0000-0000-0000-000000000001"
         };
 
-        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
-        Assert.Equal("00000000-0000-0000-0000-000000000001", options.ClientId);
+        options.FullyQualifiedNamespace.ShouldBe("my-namespace.servicebus.windows.net");
+        options.ClientId.ShouldBe("00000000-0000-0000-0000-000000000001");
     }
 
     [Fact]
@@ -120,10 +120,10 @@ public class BusWorksOptionsTests
     {
         var options = new ApplicationRegistrationOptions();
 
-        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
-        Assert.Equal(string.Empty, options.TenantId);
-        Assert.Equal(string.Empty, options.ClientId);
-        Assert.Equal(string.Empty, options.ClientSecret);
+        options.FullyQualifiedNamespace.ShouldBe(string.Empty);
+        options.TenantId.ShouldBe(string.Empty);
+        options.ClientId.ShouldBe(string.Empty);
+        options.ClientSecret.ShouldBe(string.Empty);
     }
 
     [Fact]
@@ -137,10 +137,10 @@ public class BusWorksOptionsTests
             ClientSecret = "super-secret"
         };
 
-        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
-        Assert.Equal("00000000-0000-0000-0000-000000000001", options.TenantId);
-        Assert.Equal("00000000-0000-0000-0000-000000000002", options.ClientId);
-        Assert.Equal("super-secret", options.ClientSecret);
+        options.FullyQualifiedNamespace.ShouldBe("my-namespace.servicebus.windows.net");
+        options.TenantId.ShouldBe("00000000-0000-0000-0000-000000000001");
+        options.ClientId.ShouldBe("00000000-0000-0000-0000-000000000002");
+        options.ClientSecret.ShouldBe("super-secret");
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class BusWorksOptionsTests
     {
         var options = new AzureCliOptions();
 
-        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
+        options.FullyQualifiedNamespace.ShouldBe(string.Empty);
     }
 
     [Fact]
@@ -156,6 +156,6 @@ public class BusWorksOptionsTests
     {
         var options = new AzureCliOptions { FullyQualifiedNamespace = "my-namespace.servicebus.windows.net" };
 
-        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
+        options.FullyQualifiedNamespace.ShouldBe("my-namespace.servicebus.windows.net");
     }
 }

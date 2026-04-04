@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 using BusWorks.BackgroundServices;
 using BusWorks.Consumer;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
@@ -16,7 +16,7 @@ public sealed partial class ServiceBusConsumerTests
     {
         bool isCaseInsensitive = ServiceBusConsumerDefaults.JsonSerializerOptions.PropertyNameCaseInsensitive;
 
-        Assert.True(isCaseInsensitive);
+        isCaseInsensitive.ShouldBeTrue();
     }
 
     [Fact]
@@ -27,7 +27,7 @@ public sealed partial class ServiceBusConsumerTests
         JsonSerializerOptions first = ServiceBusConsumerDefaults.JsonSerializerOptions;
         JsonSerializerOptions second = ServiceBusConsumerDefaults.JsonSerializerOptions;
 
-        Assert.Same(first, second);
+        second.ShouldBeSameAs(first);
     }
 
     [Fact]
@@ -41,10 +41,10 @@ public sealed partial class ServiceBusConsumerTests
 
         await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(consumer.ReceivedMessage);
-        Assert.Equal(id, consumer.ReceivedMessage!.Id);
-        Assert.Equal("park-opened", consumer.ReceivedMessage.Name);
-        Assert.Equal(42, consumer.ReceivedMessage.Value);
+        consumer.ReceivedMessage.ShouldNotBeNull();
+        consumer.ReceivedMessage!.Id.ShouldBe(id);
+        consumer.ReceivedMessage.Name.ShouldBe("park-opened");
+        consumer.ReceivedMessage.Value.ShouldBe(42);
     }
 
     [Fact]
@@ -57,9 +57,9 @@ public sealed partial class ServiceBusConsumerTests
 
         await InvokeAsync(consumer, raw, cts.Token);
 
-        Assert.NotNull(consumer.ReceivedMetadata);
-        Assert.Equal("msg-forward", consumer.ReceivedMetadata!.MessageId);
-        Assert.Equal(cts.Token, consumer.ReceivedCancellationToken);
+        consumer.ReceivedMetadata.ShouldNotBeNull();
+        consumer.ReceivedMetadata!.MessageId.ShouldBe("msg-forward");
+        consumer.ReceivedCancellationToken.ShouldBe(cts.Token);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public sealed partial class ServiceBusConsumerTests
 
         await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken);
 
-        Assert.Equal("park-opened", consumer.ReceivedMessage!.Name);
-        Assert.Equal(99, consumer.ReceivedMessage.Value);
+        consumer.ReceivedMessage!.Name.ShouldBe("park-opened");
+        consumer.ReceivedMessage.Value.ShouldBe(99);
     }
 
     [Fact]
@@ -83,13 +83,11 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("null"), messageId: "msg-null");
         var consumer = new TrackingConsumer();
 
-        InvalidOperationException? exception = null;
-        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
-        catch (InvalidOperationException ex) { exception = ex; }
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
 
-        Assert.NotNull(exception);
-        Assert.Contains("msg-null", exception.Message);
-        Assert.Contains(nameof(TestEvent), exception.Message);
+        exception.Message.ShouldContain("msg-null");
+        exception.Message.ShouldContain(nameof(TestEvent));
     }
 
     [Fact]
@@ -98,11 +96,8 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("{not valid json}"));
         var consumer = new TrackingConsumer();
 
-        JsonException? exception = null;
-        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
-        catch (JsonException ex) { exception = ex; }
-
-        Assert.NotNull(exception);
+        await Should.ThrowAsync<JsonException>(
+            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -112,11 +107,10 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(body);
         var consumer = new FaultingConsumer();
 
-        InvalidOperationException? exception = null;
-        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
-        catch (InvalidOperationException ex) { exception = ex; }
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
 
-        Assert.Equal(FaultingConsumer.Error, exception);
+        exception.ShouldBeSameAs(FaultingConsumer.Error);
     }
 
     private static ServiceBusReceivedMessage CreateMessage(BinaryData body, string messageId = "msg-1") =>

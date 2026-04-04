@@ -5,20 +5,14 @@ using BusWorks.Publisher;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.ServiceRegistration;
 
 /// <summary>
-/// Integration tests that verify all EventBus services are correctly wired up in the DI
-/// container.
+/// Integration tests that verify all EventBus services are correctly wired up in the DI container.
 /// </summary>
-/// <remarks>
-/// A single <see cref="EventBusHostFactory"/> is shared for the entire test collection
-/// via <see cref="ICollectionFixture{TFixture}"/>, mirroring TUnit's
-/// <c>SharedType.PerTestSession</c> pattern. The host is built once; all tests resolve
-/// services from the same container.
-/// </remarks>
 public sealed class ServiceRegistrationTests : TestBase
 {
     public ServiceRegistrationTests(EventBusHostFactory factory) : base(factory) { }
@@ -28,16 +22,15 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IEventBusPublisher publisher = GetRequiredService<IEventBusPublisher>();
 
-        Assert.NotNull(publisher);
+        publisher.ShouldNotBeNull();
     }
 
     [Fact]
     public void IEventBusPublisher_ResolvesToServiceBusPublisher()
     {
-        // ServiceBusPublisher is internal — visible here via InternalsVisibleTo.
         IEventBusPublisher publisher = GetRequiredService<IEventBusPublisher>();
 
-        Assert.IsType<ServiceBusPublisher>(publisher);
+        publisher.ShouldBeOfType<ServiceBusPublisher>();
     }
 
     [Fact]
@@ -46,7 +39,7 @@ public sealed class ServiceRegistrationTests : TestBase
         IEventBusPublisher first = GetRequiredService<IEventBusPublisher>();
         IEventBusPublisher second = GetRequiredService<IEventBusPublisher>();
 
-        Assert.Same(first, second);
+        second.ShouldBeSameAs(first);
     }
 
     [Fact]
@@ -54,7 +47,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         ServiceBusClient client = GetRequiredService<ServiceBusClient>();
 
-        Assert.NotNull(client);
+        client.ShouldNotBeNull();
     }
 
     [Fact]
@@ -63,7 +56,7 @@ public sealed class ServiceRegistrationTests : TestBase
         ServiceBusClient first = GetRequiredService<ServiceBusClient>();
         ServiceBusClient second = GetRequiredService<ServiceBusClient>();
 
-        Assert.Same(first, second);
+        second.ShouldBeSameAs(first);
     }
 
     [Fact]
@@ -71,7 +64,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         ServiceBusAssemblyRegistry registry = GetRequiredService<ServiceBusAssemblyRegistry>();
 
-        Assert.NotNull(registry);
+        registry.ShouldNotBeNull();
     }
 
     [Fact]
@@ -79,7 +72,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         Tracer tracer = GetRequiredService<Tracer>();
 
-        Assert.NotNull(tracer);
+        tracer.ShouldNotBeNull();
     }
 
     [Fact]
@@ -87,7 +80,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        Assert.Equal(EventBusAuthenticationType.ConnectionString, options.Value.AuthenticationType);
+        options.Value.AuthenticationType.ShouldBe(EventBusAuthenticationType.ConnectionString);
     }
 
     [Fact]
@@ -95,7 +88,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        Assert.Equal(Emulator.ConnectionString, options.Value.ConnectionString?.ConnectionString);
+        options.Value.ConnectionString?.ConnectionString.ShouldBe(Emulator.ConnectionString);
     }
 
     [Fact]
@@ -103,7 +96,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        Assert.Equal(10, options.Value.MaxConcurrentCalls);
+        options.Value.MaxConcurrentCalls.ShouldBe(10);
     }
 
     [Fact]
@@ -111,7 +104,7 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        Assert.Equal(8, options.Value.MaxConcurrentSessions);
+        options.Value.MaxConcurrentSessions.ShouldBe(8);
     }
 
     [Fact]
@@ -119,6 +112,6 @@ public sealed class ServiceRegistrationTests : TestBase
     {
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        Assert.Equal(1, options.Value.MaxConcurrentCallsPerSession);
+        options.Value.MaxConcurrentCallsPerSession.ShouldBe(1);
     }
 }

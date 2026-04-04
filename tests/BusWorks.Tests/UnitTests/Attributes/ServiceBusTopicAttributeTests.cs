@@ -1,4 +1,5 @@
 using BusWorks.Abstractions.Attributes;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Attributes;
@@ -27,7 +28,7 @@ public sealed class ServiceBusTopicAttributeTests
 
         var attr = new ServiceBusTopicAttribute(name);
 
-        Assert.Equal(name, attr.SubscriptionName);
+        attr.SubscriptionName.ShouldBe(name);
     }
 
     [Fact]
@@ -35,8 +36,8 @@ public sealed class ServiceBusTopicAttributeTests
     {
         var attr = new ServiceBusTopicAttribute("my-subscription");
 
-        Assert.False(attr.RequireSession);
-        Assert.Equal(5, attr.MaxDeliveryCount);
+        attr.RequireSession.ShouldBeFalse();
+        attr.MaxDeliveryCount.ShouldBe(5);
     }
     
     [Fact]
@@ -44,7 +45,7 @@ public sealed class ServiceBusTopicAttributeTests
     {
         var attr = new ServiceBusTopicAttribute("my-subscription") { MaxDeliveryCount = 0 };
 
-        Assert.Equal(0, attr.MaxDeliveryCount);
+        attr.MaxDeliveryCount.ShouldBe(0);
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class ServiceBusTopicAttributeTests
         // That validation is the responsibility of ServiceBusProcessorBackgroundService.ResolveEndpoint.
         var attr = new ServiceBusTopicAttribute("my-subscription") { MaxDeliveryCount = -1 };
 
-        Assert.Equal(-1, attr.MaxDeliveryCount);
+        attr.MaxDeliveryCount.ShouldBe(-1);
     }
 
     [Fact]
@@ -66,9 +67,9 @@ public sealed class ServiceBusTopicAttributeTests
             RequireSession = true
         };
 
-        Assert.Equal("my-subscription", attr.SubscriptionName);
-        Assert.Equal(10, attr.MaxDeliveryCount);
-        Assert.True(attr.RequireSession);
+        attr.SubscriptionName.ShouldBe("my-subscription");
+        attr.MaxDeliveryCount.ShouldBe(10);
+        attr.RequireSession.ShouldBeTrue();
     }
     
     [Fact]
@@ -76,9 +77,9 @@ public sealed class ServiceBusTopicAttributeTests
     {
         AttributeUsageAttribute usage = GetAttributeUsage(typeof(ServiceBusTopicAttribute));
 
-        Assert.Equal(AttributeTargets.Class, usage.ValidOn);
-        Assert.False(usage.Inherited);
-        Assert.False(usage.AllowMultiple);
+        usage.ValidOn.ShouldBe(AttributeTargets.Class);
+        usage.Inherited.ShouldBeFalse();
+        usage.AllowMultiple.ShouldBeFalse();
     }
     
     [Fact]
@@ -89,7 +90,7 @@ public sealed class ServiceBusTopicAttributeTests
             .Cast<ServiceBusTopicAttribute>()
             .Single();
 
-        Assert.Equal("theme-park-service", attr.SubscriptionName);
+        attr.SubscriptionName.ShouldBe("theme-park-service");
     }
 
     [Fact]
@@ -100,9 +101,9 @@ public sealed class ServiceBusTopicAttributeTests
             .Cast<ServiceBusTopicAttribute>()
             .Single();
 
-        Assert.Equal("alerts-service", attr.SubscriptionName);
-        Assert.True(attr.RequireSession);
-        Assert.Equal(3, attr.MaxDeliveryCount);
+        attr.SubscriptionName.ShouldBe("alerts-service");
+        attr.RequireSession.ShouldBeTrue();
+        attr.MaxDeliveryCount.ShouldBe(3);
     }
 
     [Fact]
@@ -113,7 +114,7 @@ public sealed class ServiceBusTopicAttributeTests
             .Cast<ServiceBusTopicAttribute>()
             .SingleOrDefault();
 
-        Assert.Null(attr);
+        attr.ShouldBeNull();
     }
     
     [Fact]
@@ -124,7 +125,7 @@ public sealed class ServiceBusTopicAttributeTests
             .Cast<TopicRouteAttribute>()
             .Single();
 
-        Assert.Equal("park-events", routeAttr.TopicName);
+        routeAttr.TopicName.ShouldBe("park-events");
     }
 
     [Fact]
@@ -132,10 +133,9 @@ public sealed class ServiceBusTopicAttributeTests
     {
         AttributeUsageAttribute usage = GetAttributeUsage(typeof(TopicRouteAttribute));
 
-        Assert.Equal(AttributeTargets.Class, usage.ValidOn);
-        Assert.False(usage.Inherited);
-
-        Assert.False(usage.AllowMultiple);
+        usage.ValidOn.ShouldBe(AttributeTargets.Class);
+        usage.Inherited.ShouldBeFalse();
+        usage.AllowMultiple.ShouldBeFalse();
     }
     
     private static AttributeUsageAttribute GetAttributeUsage(Type attributeType) =>

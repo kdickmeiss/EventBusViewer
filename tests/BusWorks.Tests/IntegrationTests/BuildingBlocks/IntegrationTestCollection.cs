@@ -12,6 +12,6 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// <c>[NotInParallel]</c> attribute.
 /// </para>
 /// </summary>
-[CollectionDefinition("IntegrationTests")]
+[CollectionDefinition(nameof(IntegrationTestCollection))]
 public class IntegrationTestCollection : ICollectionFixture<EventBusHostFactory>;
 

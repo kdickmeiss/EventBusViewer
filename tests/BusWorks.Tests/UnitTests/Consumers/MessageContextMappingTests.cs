@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
-using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 using BusWorks.BackgroundServices;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
@@ -35,7 +35,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(messageId: "test-message-id"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("test-message-id", consumer.CapturedMetadata!.MessageId);
+        consumer.CapturedMetadata!.MessageId.ShouldBe("test-message-id");
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(sessionId: "session-42"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("session-42", consumer.CapturedMetadata!.SessionId);
+        consumer.CapturedMetadata!.SessionId.ShouldBe("session-42");
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(), TestContext.Current.CancellationToken);
 
-        Assert.Null(consumer.CapturedMetadata!.SessionId);
+        consumer.CapturedMetadata!.SessionId.ShouldBeNull();
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(correlationId: "corr-999"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("corr-999", consumer.CapturedMetadata!.CorrelationId);
+        consumer.CapturedMetadata!.CorrelationId.ShouldBe("corr-999");
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(deliveryCount: 3), TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, consumer.CapturedMetadata!.DeliveryCount);
+        consumer.CapturedMetadata!.DeliveryCount.ShouldBe(3);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(sequenceNumber: 1_000_001), TestContext.Current.CancellationToken);
 
-        Assert.Equal(1_000_001, consumer.CapturedMetadata!.SequenceNumber);
+        consumer.CapturedMetadata!.SequenceNumber.ShouldBe(1_000_001);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(enqueuedTime: enqueued), TestContext.Current.CancellationToken);
 
-        Assert.Equal(enqueued, consumer.CapturedMetadata!.EnqueuedTime);
+        consumer.CapturedMetadata!.EnqueuedTime.ShouldBe(enqueued);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(contentType: "application/json"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("application/json", consumer.CapturedMetadata!.ContentType);
+        consumer.CapturedMetadata!.ContentType.ShouldBe("application/json");
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(subject: "parking.reservation.created"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("parking.reservation.created", consumer.CapturedMetadata!.Subject);
+        consumer.CapturedMetadata!.Subject.ShouldBe("parking.reservation.created");
     }
 
     [Fact]
@@ -122,8 +122,8 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(applicationProperties: props), TestContext.Current.CancellationToken);
 
-        Assert.Equal("ParkingReservationCreated", consumer.CapturedMetadata!.ApplicationProperties["EventType"]);
-        Assert.Equal("00-abc123-def456-01", consumer.CapturedMetadata.ApplicationProperties["traceparent"]);
+        consumer.CapturedMetadata!.ApplicationProperties["EventType"].ShouldBe("ParkingReservationCreated");
+        consumer.CapturedMetadata.ApplicationProperties["traceparent"].ShouldBe("00-abc123-def456-01");
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public sealed class MessageContextMappingTests
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(), TestContext.Current.CancellationToken);
 
-        Assert.NotNull(consumer.CapturedMetadata!.ApplicationProperties);
-        Assert.Empty(consumer.CapturedMetadata.ApplicationProperties);
+        consumer.CapturedMetadata!.ApplicationProperties.ShouldNotBeNull();
+        consumer.CapturedMetadata.ApplicationProperties.ShouldBeEmpty();
     }
 
     [Fact]
@@ -155,15 +155,15 @@ public sealed class MessageContextMappingTests
             applicationProperties: props), TestContext.Current.CancellationToken);
 
         MessageContext md = consumer.CapturedMetadata!;
-        Assert.Equal("full-msg", md.MessageId);
-        Assert.Equal("full-session", md.SessionId);
-        Assert.Equal("full-corr", md.CorrelationId);
-        Assert.Equal(2, md.DeliveryCount);
-        Assert.Equal(42L, md.SequenceNumber);
-        Assert.Equal(enqueued, md.EnqueuedTime);
-        Assert.Equal("application/json", md.ContentType);
-        Assert.Equal("full-subject", md.Subject);
-        Assert.Equal("v", md.ApplicationProperties["k"]);
+        md.MessageId.ShouldBe("full-msg");
+        md.SessionId.ShouldBe("full-session");
+        md.CorrelationId.ShouldBe("full-corr");
+        md.DeliveryCount.ShouldBe(2);
+        md.SequenceNumber.ShouldBe(42L);
+        md.EnqueuedTime.ShouldBe(enqueued);
+        md.ContentType.ShouldBe("application/json");
+        md.Subject.ShouldBe("full-subject");
+        md.ApplicationProperties["k"].ShouldBe("v");
     }
 
     private static ServiceBusReceivedMessage CreateMessage(

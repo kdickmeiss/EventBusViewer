@@ -1,5 +1,6 @@
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;
@@ -9,10 +10,8 @@ namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;
 /// discovery correctly — using the exact same scanning predicate that
 /// <c>ServiceBusProcessorBackgroundService</c> runs at application startup.
 /// </summary>
-public sealed partial class ConsumerDiscoveryTests : TestBase
+public sealed partial class ConsumerDiscoveryTests(EventBusHostFactory factory) : TestBase(factory)
 {
-    public ConsumerDiscoveryTests(EventBusHostFactory factory) : base(factory) { }
-
     /// <summary>
     /// Delegates directly to <see cref="ServiceBusAssemblyRegistry.GetConsumerTypes"/>, 
     /// which mirrors what the background service calls at startup.
@@ -32,7 +31,7 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        Assert.Contains(typeof(ConcreteIntegrationConsumer), discovered);
+        discovered.ShouldContain(typeof(ConcreteIntegrationConsumer));
     }
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        Assert.DoesNotContain(typeof(AbstractIntegrationConsumer), discovered);
+        discovered.ShouldNotContain(typeof(AbstractIntegrationConsumer));
     }
 
     [Fact]
@@ -56,7 +55,7 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        Assert.DoesNotContain(typeof(NotAConsumer), discovered);
+        discovered.ShouldNotContain(typeof(NotAConsumer));
     }
 
     [Fact]
@@ -75,7 +74,7 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
                 .GetInterfaces()
                 .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>));
 
-            Assert.True(implementsIConsumer);
+            implementsIConsumer.ShouldBeTrue();
         }
     }
 
@@ -90,9 +89,7 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
 
         // Assert
         foreach (Type consumerType in discovered)
-        {
-            Assert.False(consumerType.IsAbstract);
-        }
+            consumerType.IsAbstract.ShouldBeFalse();
     }
 
     [Fact]
@@ -103,8 +100,6 @@ public sealed partial class ConsumerDiscoveryTests : TestBase
 
         // Assert
         foreach (Type consumerType in discovered)
-        {
-            Assert.True(consumerType.IsClass);
-        }
+            consumerType.IsClass.ShouldBeTrue();
     }
 }

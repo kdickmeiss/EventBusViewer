@@ -1,5 +1,4 @@
 using BusWorks;
-using EventBusViewer.ServiceDefaults;
 using OpenTelemetry.Trace;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);

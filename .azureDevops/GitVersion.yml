@@ -1,17 +1,18 @@
-next-version: 1.0.0
 commit-message-incrementing: Enabled
 
 # Conventional Commits — https://www.conventionalcommits.org
-major-version-bump-message: '^breaking(\(.+\))?:'
-minor-version-bump-message: '^feat(\(.+\))?:'
-patch-version-bump-message: '^(fix|perf)(\(.+\))?:'
-no-bump-message: '^(chore|docs|style|test|build|ci|refactor)(\(.+\))?:'
+# No ^ anchor: Azure DevOps merge commits are prefixed with "Merged PR {id}: "
+# so the conventional type appears mid-message, not at the start.
+major-version-bump-message: 'breaking(\(.+\))?:'
+minor-version-bump-message: 'feat(\(.+\))?:'
+patch-version-bump-message: '(fix|perf)(\(.+\))?:'
+no-bump-message: '(chore|docs|style|test|build|ci|refactor)(\(.+\))?:'
 
 branches:
   main:
     regex: ^main$
     increment: Patch
-    deployment-mode: ContinuousDeployment
+    deployment-mode: ManualDeployment   # stable versions are driven by the git tag the pipeline creates
     prevent-increment:
       of-merged-branch: true
   feature:

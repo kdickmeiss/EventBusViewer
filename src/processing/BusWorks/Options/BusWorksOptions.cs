@@ -15,9 +15,9 @@ public enum EventBusAuthenticationType
     AzureCli
 }
 
-public sealed class EventBusOptions
+public sealed class BusWorksOptions
 {
-    public const string SectionName = "EventBusOptions";
+    public const string SectionName = "BusWorksOptions";
 
     /// <summary>Selects the Azure Service Bus authentication strategy.</summary>
     public EventBusAuthenticationType AuthenticationType { get; init; }

@@ -97,7 +97,7 @@ internal sealed class ServiceRegistrationTests : TestBase
     public async Task EventBusOptions_AuthenticationType_BindsFromConfiguration()
     {
         // Act
-        IOptions<EventBusOptions> options = GetRequiredService<IOptions<EventBusOptions>>();
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
         // Assert
         await Assert.That(options.Value.AuthenticationType)
@@ -108,7 +108,7 @@ internal sealed class ServiceRegistrationTests : TestBase
     public async Task EventBusOptions_ConnectionString_BindsFromConfiguration()
     {
         // Act
-        IOptions<EventBusOptions> options = GetRequiredService<IOptions<EventBusOptions>>();
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
         // Assert
         await Assert.That(options.Value.ConnectionString?.ConnectionString)
@@ -119,7 +119,7 @@ internal sealed class ServiceRegistrationTests : TestBase
     public async Task EventBusOptions_MaxConcurrentCalls_BindsFromConfiguration()
     {
         // Act
-        IOptions<EventBusOptions> options = GetRequiredService<IOptions<EventBusOptions>>();
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
         // Assert
         await Assert.That(options.Value.MaxConcurrentCalls).IsEqualTo(10);
@@ -129,7 +129,7 @@ internal sealed class ServiceRegistrationTests : TestBase
     public async Task EventBusOptions_MaxConcurrentSessions_BindsFromConfiguration()
     {
         // Act
-        IOptions<EventBusOptions> options = GetRequiredService<IOptions<EventBusOptions>>();
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
         // Assert
         await Assert.That(options.Value.MaxConcurrentSessions).IsEqualTo(8);
@@ -139,7 +139,7 @@ internal sealed class ServiceRegistrationTests : TestBase
     public async Task EventBusOptions_MaxConcurrentCallsPerSession_BindsFromConfiguration()
     {
         // Act
-        IOptions<EventBusOptions> options = GetRequiredService<IOptions<EventBusOptions>>();
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
         // Assert
         await Assert.That(options.Value.MaxConcurrentCallsPerSession).IsEqualTo(1);

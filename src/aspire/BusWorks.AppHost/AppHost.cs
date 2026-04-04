@@ -50,9 +50,4 @@ builder.AddProject<BusWorks_Examples_Receiver>("exampleReceiver")
     .WaitFor(serviceBus)
     .WithReference(serviceBus);
 
-// builder.AddProject<EventBusViewer_Tool>("tool").
-//     WaitFor(serviceBus)
-//     .WithReference(serviceBus);
-//     
-
 await builder.Build().RunAsync();

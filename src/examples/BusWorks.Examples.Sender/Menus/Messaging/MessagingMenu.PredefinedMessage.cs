@@ -20,7 +20,7 @@ internal sealed partial class MessagingMenu
         AnsiConsole.Clear();
         RenderHeader(forQueue, "Pre-Defined Message");
 
-        string messageBody = BuildMessage(forQueue);
+        string messageBody = await SendMessage(forQueue);
 
         AnsiConsole.Write(new Panel(messageBody)
         {
@@ -34,26 +34,27 @@ internal sealed partial class MessagingMenu
         await SendWithFeedbackAsync(destination, messageBody, cancellationToken);
     }
 
-    private static string BuildMessage(bool forQueue)
+    private async Task<string> SendMessage(bool forQueue)
     {
+        dynamic @event;
         if (forQueue)
         {
-            return JsonSerializer.Serialize(
-                new ParkingSpotReservedIntegrationEvent(
-                    Guid.NewGuid(),
-                    DateTime.UtcNow,
-                    "GKL-22-P",
-                    DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12))),
-                PrettyPrint);
-        }
-
-        return JsonSerializer.Serialize(
-            new ParkingTicketBoughtIntegrationEvent(
+            @event = new ParkingSpotReservedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
                 "GKL-22-P",
-                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12))),
-            PrettyPrint);
+                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12)));
+        }
+        else
+        {
+            @event = new ParkingTicketBoughtIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                "GKL-22-P",
+                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12)));
+        }
+        
+        await publisher.PublishAsync(@event);
+        return JsonSerializer.Serialize(@event, PrettyPrint);
     }
 }
-

@@ -13,11 +13,11 @@ internal sealed class ServiceBusProcessorBackgroundService(
     IServiceScopeFactory serviceScopeFactory,
     ServiceBusClient serviceBusClient,
     ServiceBusAssemblyRegistry assemblyRegistry,
-    IOptions<EventBusOptions> eventBusOptions,
+    IOptions<BusWorksOptions> eventBusOptions,
     Tracer tracer,
     ILogger<ServiceBusProcessorBackgroundService> logger) : BackgroundService
 {
-    private readonly EventBusOptions _options = eventBusOptions.Value;
+    private readonly BusWorksOptions _worksOptions = eventBusOptions.Value;
     private readonly ServiceBusTelemetry _telemetry = new(tracer, logger);
     private readonly List<ServiceBusProcessor> _serviceBusProcessors = [];
     private readonly List<ServiceBusSessionProcessor> _serviceBusSessionProcessors = [];
@@ -110,7 +110,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         var options = new ServiceBusProcessorOptions
         {
-            MaxConcurrentCalls = _options.MaxConcurrentCalls,
+            MaxConcurrentCalls = _worksOptions.MaxConcurrentCalls,
             AutoCompleteMessages = false,
             MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)
         };
@@ -124,8 +124,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         var options = new ServiceBusSessionProcessorOptions
         {
-            MaxConcurrentSessions = _options.MaxConcurrentSessions,
-            MaxConcurrentCallsPerSession = _options.MaxConcurrentCallsPerSession,
+            MaxConcurrentSessions = _worksOptions.MaxConcurrentSessions,
+            MaxConcurrentCallsPerSession = _worksOptions.MaxConcurrentCallsPerSession,
             AutoCompleteMessages = false,
             MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)
         };

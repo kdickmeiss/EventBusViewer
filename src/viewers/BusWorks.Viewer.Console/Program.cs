@@ -1,8 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
+using BusWorks.ServiceDefaults;
 using BusWorks.Viewer.Console.Menus;
 using BusWorks.Viewer.Console.Services;
-using EventBusViewer.ServiceDefaults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using QueueMenu = BusWorks.Viewer.Console.Menus.Queue.QueueMenu;

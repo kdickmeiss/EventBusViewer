@@ -36,18 +36,18 @@ internal sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
             .ConfigureAppConfiguration(config =>
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    [$"{EventBusOptions.SectionName}:AuthenticationType"] =
+                    [$"{BusWorksOptions.SectionName}:AuthenticationType"] =
                         nameof(EventBusAuthenticationType.ConnectionString),
-                    [$"{EventBusOptions.SectionName}:ConnectionString:ConnectionString"] =
+                    [$"{BusWorksOptions.SectionName}:ConnectionString:ConnectionString"] =
                         Emulator.ConnectionString,
-                    [$"{EventBusOptions.SectionName}:MaxConcurrentCalls"] = "10",
-                    [$"{EventBusOptions.SectionName}:MaxConcurrentSessions"] = "8",
-                    [$"{EventBusOptions.SectionName}:MaxConcurrentCallsPerSession"] = "1",
+                    [$"{BusWorksOptions.SectionName}:MaxConcurrentCalls"] = "10",
+                    [$"{BusWorksOptions.SectionName}:MaxConcurrentSessions"] = "8",
+                    [$"{BusWorksOptions.SectionName}:MaxConcurrentCallsPerSession"] = "1",
                 }))
             .ConfigureServices((context, services) =>
             {
-                services.Configure<EventBusOptions>(
-                    context.Configuration.GetSection(EventBusOptions.SectionName));
+                services.Configure<BusWorksOptions>(
+                    context.Configuration.GetSection(BusWorksOptions.SectionName));
 
                 services
                     // Reuse the same ServiceBusClient that the emulator fixture owns so

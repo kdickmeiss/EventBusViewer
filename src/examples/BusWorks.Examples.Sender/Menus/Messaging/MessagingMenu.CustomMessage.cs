@@ -35,13 +35,12 @@ internal sealed partial class MessagingMenu
                         : ValidationResult.Error("[red]Must be greater than 0.[/]")),
                 cancellationToken);
 
-            messageBody = JsonSerializer.Serialize(
+            messageBody = await SendCustomEventAsync(
                 new ParkingSpotReservedIntegrationEvent(
                     Guid.NewGuid(),
                     DateTime.UtcNow,
                     licensePlate,
-                    DateOnly.FromDateTime(DateTime.UtcNow.AddDays(reservedDays))),
-                PrettyPrint);
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddDays(reservedDays))));
         }
         else
         {
@@ -53,17 +52,30 @@ internal sealed partial class MessagingMenu
                         : ValidationResult.Error("[red]Must be 0 or greater.[/]")),
                 cancellationToken);
 
-            messageBody = JsonSerializer.Serialize(
+            messageBody = await SendCustomEventAsync(
                 new ParkingTicketBoughtIntegrationEvent(
                     Guid.NewGuid(),
                     DateTime.UtcNow,
                     licensePlate,
-                    DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysOffset))),
-                PrettyPrint);
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysOffset))));
         }
 
+        AnsiConsole.Write(new Panel(messageBody)
+        {
+            Header      = new PanelHeader(" [grey]Message Preview[/] "),
+            Border      = BoxBorder.Rounded,
+            BorderStyle = Style.Parse("grey"),
+            Padding     = new Padding(1, 0)
+        });
         AnsiConsole.WriteLine();
+
         await SendWithFeedbackAsync(destination, messageBody, cancellationToken);
+    }
+
+    private async Task<string> SendCustomEventAsync(dynamic @event)
+    {
+        await publisher.PublishAsync(@event);
+        return JsonSerializer.Serialize(@event, PrettyPrint);
     }
 }
 

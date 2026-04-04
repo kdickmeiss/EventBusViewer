@@ -5,12 +5,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
-        <PackageReference Include="Spectre.Console" Version="0.54.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.15.1" />
+        <PackageReference Include="Spectre.Console" Version="0.55.0" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\aspire\BusWorks.ServiceDefaults\BusWorks.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\..\processing\BusWorks\BusWorks.csproj" />
         <ProjectReference Include="..\BusWorks.Examples.IntegrationEvents\BusWorks.Examples.IntegrationEvents.csproj" />
     </ItemGroup>
     

@@ -2,7 +2,7 @@ using BusWorks.Options;
 
 namespace BusWorks.Tests.UnitTests.Options;
 
-public class EventBusOptionsTests
+public class BusWorksOptionsTests
 {
     [Test]
     public async Task EventBusOptions_Defaults_AreCorrect()
@@ -11,7 +11,7 @@ public class EventBusOptionsTests
         // no AuthenticationType is specified in appsettings.json.
         // All sub-option objects default to null; a missing block for the selected
         // auth type causes an InvalidOperationException at startup.
-        var options = new EventBusOptions();
+        var options = new BusWorksOptions();
 
         await Assert.That(options.AuthenticationType).IsEqualTo(EventBusAuthenticationType.ConnectionString);
         await Assert.That(options.ConnectionString).IsNull();
@@ -29,7 +29,7 @@ public class EventBusOptionsTests
     [Arguments(EventBusAuthenticationType.AzureCli)]
     public async Task AuthenticationType_CanBeConfigured(EventBusAuthenticationType authenticationType)
     {
-        var options = new EventBusOptions { AuthenticationType = authenticationType };
+        var options = new BusWorksOptions { AuthenticationType = authenticationType };
 
         await Assert.That(options.AuthenticationType).IsEqualTo(authenticationType);
     }
@@ -37,7 +37,7 @@ public class EventBusOptionsTests
     [Test]
     public async Task MaxConcurrentCalls_CanBeOverridden()
     {
-        var options = new EventBusOptions { MaxConcurrentCalls = 20 };
+        var options = new BusWorksOptions { MaxConcurrentCalls = 20 };
 
         await Assert.That(options.MaxConcurrentCalls).IsEqualTo(20);
     }
@@ -45,7 +45,7 @@ public class EventBusOptionsTests
     [Test]
     public async Task MaxConcurrentSessions_CanBeOverridden()
     {
-        var options = new EventBusOptions { MaxConcurrentSessions = 16 };
+        var options = new BusWorksOptions { MaxConcurrentSessions = 16 };
 
         await Assert.That(options.MaxConcurrentSessions).IsEqualTo(16);
     }
@@ -53,7 +53,7 @@ public class EventBusOptionsTests
     [Test]
     public async Task MaxConcurrentCallsPerSession_CanBeOverridden()
     {
-        var options = new EventBusOptions { MaxConcurrentCallsPerSession = 2 };
+        var options = new BusWorksOptions { MaxConcurrentCallsPerSession = 2 };
 
         await Assert.That(options.MaxConcurrentCallsPerSession).IsEqualTo(2);
     }

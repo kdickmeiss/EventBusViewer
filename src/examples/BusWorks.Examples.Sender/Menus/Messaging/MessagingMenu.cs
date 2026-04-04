@@ -1,9 +1,13 @@
-﻿using BusWorks.Examples.Sender.Services;
+﻿using BusWorks.Abstractions;
+using BusWorks.Examples.Sender.Services;
 using Spectre.Console;
 
 namespace BusWorks.Examples.Sender.Menus.Messaging;
 
-internal sealed partial class MessagingMenu(MessagingService messagingService)
+internal sealed partial class MessagingMenu(
+    MessagingService messagingService,
+    IEventBusPublisher publisher
+    )
 {
     private const string QueueName = "parking-spot-reserved";
     private const string TopicName = "parking-ticket-bought";
@@ -42,12 +46,10 @@ internal sealed partial class MessagingMenu(MessagingService messagingService)
         }
     }
 
-    // ── Shared helpers ────────────────────────────────────────────────────────
-
     private static void RenderHeader(bool forQueue, string? subtitle = null)
     {
         AnsiConsole.Write(
-            new FigletText("BusWorks")
+            new FigletText("BusWorks Sender")
                 .Centered()
                 .Color(Color.DeepSkyBlue1));
 

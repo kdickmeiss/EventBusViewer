@@ -1,7 +1,7 @@
 using System.Diagnostics;
+using BusWorks.ServiceDefaults;
 using BusWorks.Viewer.Components;
 using BusWorks.Viewer.Services;
-using EventBusViewer.ServiceDefaults;
 using MudBlazor.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);

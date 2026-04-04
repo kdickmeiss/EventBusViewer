@@ -33,40 +33,40 @@ public static class DependencyInjection
         IConfiguration configuration,
         params Assembly[] consumerAssemblies)
     {
-        EventBusOptions options = configuration
-                                      .GetSection(EventBusOptions.SectionName)
-                                      .Get<EventBusOptions>()
+        BusWorksOptions worksOptions = configuration
+                                      .GetSection(BusWorksOptions.SectionName)
+                                      .Get<BusWorksOptions>()
                                   ?? throw new InvalidOperationException(
-                                      $"The '{EventBusOptions.SectionName}' configuration section is missing or empty.");
+                                      $"The '{BusWorksOptions.SectionName}' configuration section is missing or empty.");
         
-        services.Configure<EventBusOptions>(configuration.GetSection(EventBusOptions.SectionName));
+        services.Configure<BusWorksOptions>(configuration.GetSection(BusWorksOptions.SectionName));
 
-        return services.AddBusWorksCore(options, consumerAssemblies);
+        return services.AddBusWorksCore(worksOptions, consumerAssemblies);
     }
     
     /// <summary>
-    /// Registers BusWorks services using a pre-built <see cref="EventBusOptions"/> instance.
+    /// Registers BusWorks services using a pre-built <see cref="BusWorksOptions"/> instance.
     /// </summary>
     /// <remarks>
     /// Use this overload when options are constructed programmatically or in test scenarios.
-    /// The provided <paramref name="options"/> instance is registered as a singleton
+    /// The provided <paramref name="worksOptions"/> instance is registered as a singleton
     /// and made available via <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>.
     /// </remarks>
     /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
-    /// <param name="options">The fully configured <see cref="EventBusOptions"/> instance.</param>
+    /// <param name="worksOptions">The fully configured <see cref="BusWorksOptions"/> instance.</param>
     /// <param name="consumerAssemblies">
     /// One or more assemblies to scan for <see cref="IIntegrationEvent"/> consumer implementations.
     /// </param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for chaining.</returns>
     public static IServiceCollection AddBusWorks(
         this IServiceCollection services,
-        EventBusOptions options,
+        BusWorksOptions worksOptions,
         params Assembly[] consumerAssemblies)
     {
         
-        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(options));
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(worksOptions));
 
-        return services.AddBusWorksCore(options, consumerAssemblies);
+        return services.AddBusWorksCore(worksOptions, consumerAssemblies);
     }
     
     /// <summary>
@@ -83,17 +83,17 @@ public static class DependencyInjection
     /// </code>
     /// </remarks>
     /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
-    /// <param name="configure">A delegate that configures the <see cref="EventBusOptions"/>.</param>
+    /// <param name="configure">A delegate that configures the <see cref="BusWorksOptions"/>.</param>
     /// <param name="consumerAssemblies">
     /// One or more assemblies to scan for <see cref="IIntegrationEvent"/> consumer implementations.
     /// </param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for chaining.</returns>
     public static IServiceCollection AddBusWorks(
         this IServiceCollection services,
-        Action<EventBusOptions> configure,
+        Action<BusWorksOptions> configure,
         params Assembly[] consumerAssemblies)
     {
-        var options = new EventBusOptions();
+        var options = new BusWorksOptions();
         configure(options);
         
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(options));
@@ -107,16 +107,15 @@ public static class DependencyInjection
     /// <paramref name="consumerAssemblies"/>, and wires up all required BusWorks services.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
-    /// <param name="options">The resolved <see cref="EventBusOptions"/>.</param>
+    /// <param name="worksOptions">The resolved <see cref="BusWorksOptions"/>.</param>
     /// <param name="consumerAssemblies">Assemblies to scan for consumer implementations.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for chaining.</returns>
     private static IServiceCollection AddBusWorksCore(
         this IServiceCollection services,
-        EventBusOptions options,
+        BusWorksOptions worksOptions,
         params Assembly[] consumerAssemblies)
     {
-
-        ServiceBusClient serviceBusClient = GetServiceBusClientByConfig(options);
+        ServiceBusClient serviceBusClient = GetServiceBusClientByConfig(worksOptions);
 
         var registry = new ServiceBusAssemblyRegistry(consumerAssemblies);
 
@@ -136,51 +135,51 @@ public static class DependencyInjection
     
     /// <summary>
     /// Creates and returns a <see cref="ServiceBusClient"/> configured according to the
-    /// <see cref="EventBusOptions.AuthenticationType"/> specified in <paramref name="options"/>.
+    /// <see cref="BusWorksOptions.AuthenticationType"/> specified in <paramref name="worksOptions"/>.
     /// </summary>
-    /// <param name="options">The <see cref="EventBusOptions"/> containing authentication configuration.</param>
+    /// <param name="worksOptions">The <see cref="BusWorksOptions"/> containing authentication configuration.</param>
     /// <returns>A fully configured <see cref="ServiceBusClient"/>.</returns>
     /// <exception cref="InvalidOperationException">
     /// Thrown when a required configuration value for the selected authentication type is missing,
     /// or when an unsupported <see cref="EventBusAuthenticationType"/> value is specified.
     /// </exception>
-    private static ServiceBusClient GetServiceBusClientByConfig(EventBusOptions options) =>
-        options.AuthenticationType switch
+    private static ServiceBusClient GetServiceBusClientByConfig(BusWorksOptions worksOptions) =>
+        worksOptions.AuthenticationType switch
             {
                 EventBusAuthenticationType.ConnectionString =>
                     new ServiceBusClient(
-                        options.ConnectionString?.ConnectionString
+                        worksOptions.ConnectionString?.ConnectionString
                         ?? throw new InvalidOperationException(
                             $"EventBusOptions.ConnectionString.ConnectionString is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ConnectionString)}'")),
 
                 EventBusAuthenticationType.ManagedIdentity =>
                     new ServiceBusClient(
-                        options.ManagedIdentity?.FullyQualifiedNamespace
+                        worksOptions.ManagedIdentity?.FullyQualifiedNamespace
                         ?? throw new InvalidOperationException(
                             $"EventBusOptions.ManagedIdentity.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ManagedIdentity)}'"),
-                        options.ManagedIdentity.ClientId is { Length: > 0 } clientId
-                            ? new ManagedIdentityCredential(clientId)   // user-assigned
-                            : new ManagedIdentityCredential()),          // system-assigned
+                        worksOptions.ManagedIdentity.ClientId is { Length: > 0 } clientId
+                             ? new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId))   // user-assigned
+                            : new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned)),                     // system-assigned
                 
                 EventBusAuthenticationType.AzureCli =>
                     new ServiceBusClient(
-                        options.AzureCli?.FullyQualifiedNamespace
+                        worksOptions.AzureCli?.FullyQualifiedNamespace
                         ?? throw new InvalidOperationException(
                             $"EventBusOptions.AzureCli.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.AzureCli)}'"),
                         new AzureCliCredential()),
 
                 EventBusAuthenticationType.ApplicationRegistration =>
                     new ServiceBusClient(
-                        options.ApplicationRegistration?.FullyQualifiedNamespace
+                        worksOptions.ApplicationRegistration?.FullyQualifiedNamespace
                         ?? throw new InvalidOperationException(
                             $"EventBusOptions.ApplicationRegistration.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ApplicationRegistration)}'"),
                         new ClientSecretCredential(
-                            options.ApplicationRegistration.TenantId,
-                            options.ApplicationRegistration.ClientId,
-                            options.ApplicationRegistration.ClientSecret)),
+                            worksOptions.ApplicationRegistration.TenantId,
+                            worksOptions.ApplicationRegistration.ClientId,
+                            worksOptions.ApplicationRegistration.ClientSecret)),
 
                 _ => throw new InvalidOperationException(
-                    $"Unsupported EventBus authentication type: '{options.AuthenticationType}'. " +
+                    $"Unsupported EventBus authentication type: '{worksOptions.AuthenticationType}'. " +
                     $"Valid values are: {string.Join(", ", Enum.GetNames<EventBusAuthenticationType>())}")
             };
 }

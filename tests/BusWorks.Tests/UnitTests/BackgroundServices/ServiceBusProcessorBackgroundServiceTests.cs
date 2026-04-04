@@ -1,233 +1,215 @@
 using BusWorks.BackgroundServices;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
-internal sealed partial class ServiceBusProcessorBackgroundServiceTests
+public sealed partial class ServiceBusProcessorBackgroundServiceTests
 {
-    [Test]
-    public async Task ServiceBusEndpoint_Defaults_AreCorrect()
+    [Fact]
+    public void ServiceBusEndpoint_Defaults_AreCorrect()
     {
         ServiceBusEndpoint endpoint = new("my-queue");
 
-        await Assert.That(endpoint.QueueOrTopicName).IsEqualTo("my-queue");
-        await Assert.That(endpoint.SubscriptionName).IsNull();
-        await Assert.That(endpoint.RequireSession).IsFalse();
-        await Assert.That(endpoint.MaxDeliveryCount).IsEqualTo(5);
+        Assert.Equal("my-queue", endpoint.QueueOrTopicName);
+        Assert.Null(endpoint.SubscriptionName);
+        Assert.False(endpoint.RequireSession);
+        Assert.Equal(5, endpoint.MaxDeliveryCount);
     }
 
-    [Test]
-    public async Task ServiceBusEndpoint_IsQueue_And_IsTopic_ReflectSubscriptionPresence()
+    [Fact]
+    public void ServiceBusEndpoint_IsQueue_And_IsTopic_ReflectSubscriptionPresence()
     {
         ServiceBusEndpoint queue = new("my-queue");
         ServiceBusEndpoint topic = new("my-topic", SubscriptionName: "my-sub");
 
-        await Assert.That(queue.IsQueue).IsTrue();
-        await Assert.That(queue.IsTopic).IsFalse();
-        await Assert.That(topic.IsQueue).IsFalse();
-        await Assert.That(topic.IsTopic).IsTrue();
+        Assert.True(queue.IsQueue);
+        Assert.False(queue.IsTopic);
+        Assert.False(topic.IsQueue);
+        Assert.True(topic.IsTopic);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_WithExplicitName_UsesExplicitName()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_WithExplicitName_UsesExplicitName()
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(ExplicitQueueConsumer));
 
-        await Assert.That(endpoint.QueueOrTopicName).IsEqualTo("explicit-queue");
-        await Assert.That(endpoint.IsQueue).IsTrue();
-        await Assert.That(endpoint.SubscriptionName).IsNull();
+        Assert.Equal("explicit-queue", endpoint.QueueOrTopicName);
+        Assert.True(endpoint.IsQueue);
+        Assert.Null(endpoint.SubscriptionName);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_WithImplicitName_ResolvesFromQueueRoute()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_WithImplicitName_ResolvesFromQueueRoute()
     {
-        // The recommended usage — no explicit name on [ServiceBusQueue], resolved from [QueueRoute] on the message type.
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(ImplicitQueueConsumer));
 
-        await Assert.That(endpoint.QueueOrTopicName).IsEqualTo("order-queue");
-        await Assert.That(endpoint.IsQueue).IsTrue();
+        Assert.Equal("order-queue", endpoint.QueueOrTopicName);
+        Assert.True(endpoint.IsQueue);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_WithSession_PreservesAllProperties()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_WithSession_PreservesAllProperties()
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(SessionQueueConsumer));
 
-        await Assert.That(endpoint.QueueOrTopicName).IsEqualTo("session-queue");
-        await Assert.That(endpoint.RequireSession).IsTrue();
-        await Assert.That(endpoint.MaxDeliveryCount).IsEqualTo(3);
+        Assert.Equal("session-queue", endpoint.QueueOrTopicName);
+        Assert.True(endpoint.RequireSession);
+        Assert.Equal(3, endpoint.MaxDeliveryCount);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_NegativeMaxDeliveryCount_Throws()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_NegativeMaxDeliveryCount_Throws()
     {
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(NegativeDeliveryCountQueueConsumer)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(NegativeDeliveryCountQueueConsumer));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(NegativeDeliveryCountQueueConsumer), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_MessageTypeHasTopicRoute_Throws()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_MessageTypeHasTopicRoute_Throws()
     {
-        // [ServiceBusQueue] on a consumer whose message type is declared as a topic — caught at startup.
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(QueueConsumerWithTopicMessage)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(QueueConsumerWithTopicMessage));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(QueueConsumerWithTopicMessage), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_QueueConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
     {
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(QueueConsumerWithUnroutedMessage)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(QueueConsumerWithUnroutedMessage));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(QueueConsumerWithUnroutedMessage), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_TopicConsumer_ResolvesFromTopicRoute()
+    [Fact]
+    public void ResolveEndpoint_TopicConsumer_ResolvesFromTopicRoute()
     {
         ServiceBusEndpoint endpoint = InvokeResolveEndpoint(typeof(TopicConsumer));
 
-        await Assert.That(endpoint.QueueOrTopicName).IsEqualTo("park-events");
-        await Assert.That(endpoint.SubscriptionName).IsEqualTo("resort-subscription");
-        await Assert.That(endpoint.IsTopic).IsTrue();
+        Assert.Equal("park-events", endpoint.QueueOrTopicName);
+        Assert.Equal("resort-subscription", endpoint.SubscriptionName);
+        Assert.True(endpoint.IsTopic);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_TopicConsumer_NegativeMaxDeliveryCount_ThrowsInvalidOperationException()
+    [Fact]
+    public void ResolveEndpoint_TopicConsumer_NegativeMaxDeliveryCount_ThrowsInvalidOperationException()
     {
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(NegativeDeliveryCountTopicConsumer)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(NegativeDeliveryCountTopicConsumer));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(NegativeDeliveryCountTopicConsumer), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_TopicConsumer_MessageTypeHasQueueRoute_ThrowsInvalidOperationException()
+    [Fact]
+    public void ResolveEndpoint_TopicConsumer_MessageTypeHasQueueRoute_ThrowsInvalidOperationException()
     {
-        // [ServiceBusTopic] on a consumer whose message type is declared as a queue — caught at startup.
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(TopicConsumerWithQueueMessage)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(TopicConsumerWithQueueMessage));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(TopicConsumerWithQueueMessage), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_TopicConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
+    [Fact]
+    public void ResolveEndpoint_TopicConsumer_MessageTypeHasNoRoute_ThrowsInvalidOperationException()
     {
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(TopicConsumerWithUnroutedMessage)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(TopicConsumerWithUnroutedMessage));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(TopicConsumerWithUnroutedMessage), exception.Message);
     }
 
-    [Test]
-    public async Task ResolveEndpoint_ConsumerWithNoRoutingAttribute_ThrowsInvalidOperationException()
+    [Fact]
+    public void ResolveEndpoint_ConsumerWithNoRoutingAttribute_ThrowsInvalidOperationException()
     {
         InvalidOperationException? exception = null;
         try { InvokeResolveEndpoint(typeof(UnattributedConsumer)); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(UnattributedConsumer));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(UnattributedConsumer), exception.Message);
     }
 
-    [Test]
-    public async Task ValidateSessionContract_SessionConsumer_WithSessionedMessage_IsValid()
+    [Fact]
+    public void ValidateSessionContract_SessionConsumer_WithSessionedMessage_IsValid()
     {
-        // RequireSession = true + ISessionedEvent message → valid configuration.
         ServiceBusEndpoint endpoint = new("session-queue", RequireSession: true);
 
         InvalidOperationException? exception = null;
         try { InvokeValidateSessionContract(typeof(SessionQueueConsumer), endpoint); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNull();
+        Assert.Null(exception);
     }
 
-    [Test]
-    public async Task ValidateSessionContract_NonSessionConsumer_WithNonSessionedMessage_IsValid()
+    [Fact]
+    public void ValidateSessionContract_NonSessionConsumer_WithNonSessionedMessage_IsValid()
     {
-        // RequireSession = false + non-ISessionedEvent message → valid configuration.
         ServiceBusEndpoint endpoint = new("order-queue", RequireSession: false);
 
         InvalidOperationException? exception = null;
         try { InvokeValidateSessionContract(typeof(ImplicitQueueConsumer), endpoint); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNull();
+        Assert.Null(exception);
     }
 
-    [Test]
-    public async Task ValidateSessionContract_SessionConsumer_WithNonSessionedMessage_ThrowsInvalidOperationException()
+    [Fact]
+    public void ValidateSessionContract_SessionConsumer_WithNonSessionedMessage_ThrowsInvalidOperationException()
     {
-        // RequireSession = true but message does NOT implement ISessionedEvent → caught at startup.
         ServiceBusEndpoint endpoint = new("order-queue", RequireSession: true);
 
         InvalidOperationException? exception = null;
         try { InvokeValidateSessionContract(typeof(SessionConsumerForNonSessionedMessage), endpoint); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsConsumerName = exception!.Message.Contains(nameof(SessionConsumerForNonSessionedMessage));
-        await Assert.That(containsConsumerName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(SessionConsumerForNonSessionedMessage), exception.Message);
     }
 
-    [Test]
-    public async Task ValidateSessionContract_NonSessionConsumer_WithSessionedMessage_ThrowsInvalidOperationException()
+    [Fact]
+    public void ValidateSessionContract_NonSessionConsumer_WithSessionedMessage_ThrowsInvalidOperationException()
     {
-        // ISessionedEvent message but RequireSession = false → caught at startup.
         ServiceBusEndpoint endpoint = new("session-queue", RequireSession: false);
 
         InvalidOperationException? exception = null;
         try { InvokeValidateSessionContract(typeof(NonSessionConsumerForSessionedMessage), endpoint); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        bool containsMessageTypeName = exception!.Message.Contains(nameof(SessionMessage));
-        await Assert.That(containsMessageTypeName).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains(nameof(SessionMessage), exception.Message);
     }
 
-    [Test]
-    public async Task GetConsumerMessageType_GenericConsumer_ReturnsMessageType()
+    [Fact]
+    public void GetConsumerMessageType_GenericConsumer_ReturnsMessageType()
     {
         Type? messageType = InvokeGetConsumerMessageType(typeof(ImplicitQueueConsumer));
 
-        await Assert.That(messageType).IsEqualTo(typeof(QueueMessage));
+        Assert.Equal(typeof(QueueMessage), messageType);
     }
 
-
-    [Test]
-    public async Task GetConsumerMessageType_DeeplyNestedConsumer_ReturnsMessageType()
+    [Fact]
+    public void GetConsumerMessageType_DeeplyNestedConsumer_ReturnsMessageType()
     {
-        // Resolves through multiple inheritance levels — important for real-world consumers
-        // that extend an intermediate base class.
         Type? messageType = InvokeGetConsumerMessageType(typeof(DeeplyNestedConsumer));
 
-        await Assert.That(messageType).IsEqualTo(typeof(QueueMessage));
+        Assert.Equal(typeof(QueueMessage), messageType);
     }
-    
+
     // These thin wrappers call the public static methods on the extracted helper
     // classes directly — no reflection needed after the refactoring.
     private static ServiceBusEndpoint InvokeResolveEndpoint(Type consumerType)

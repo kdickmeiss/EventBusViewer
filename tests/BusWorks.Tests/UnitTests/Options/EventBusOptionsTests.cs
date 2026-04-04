@@ -1,115 +1,109 @@
 using BusWorks.Options;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Options;
 
 public class BusWorksOptionsTests
 {
-    [Test]
-    public async Task EventBusOptions_Defaults_AreCorrect()
+    [Fact]
+    public void EventBusOptions_Defaults_AreCorrect()
     {
-        // ConnectionString is the enum's zero value — the implicit default when
-        // no AuthenticationType is specified in appsettings.json.
-        // All sub-option objects default to null; a missing block for the selected
-        // auth type causes an InvalidOperationException at startup.
         var options = new BusWorksOptions();
 
-        await Assert.That(options.AuthenticationType).IsEqualTo(EventBusAuthenticationType.ConnectionString);
-        await Assert.That(options.ConnectionString).IsNull();
-        await Assert.That(options.ManagedIdentity).IsNull();
-        await Assert.That(options.ApplicationRegistration).IsNull();
-        await Assert.That(options.AzureCli).IsNull();
-        await Assert.That(options.MaxConcurrentCalls).IsEqualTo(10);
-        await Assert.That(options.MaxConcurrentSessions).IsEqualTo(8);
-        await Assert.That(options.MaxConcurrentCallsPerSession).IsEqualTo(1);
+        Assert.Equal(EventBusAuthenticationType.ConnectionString, options.AuthenticationType);
+        Assert.Null(options.ConnectionString);
+        Assert.Null(options.ManagedIdentity);
+        Assert.Null(options.ApplicationRegistration);
+        Assert.Null(options.AzureCli);
+        Assert.Equal(10, options.MaxConcurrentCalls);
+        Assert.Equal(8, options.MaxConcurrentSessions);
+        Assert.Equal(1, options.MaxConcurrentCallsPerSession);
     }
 
-    [Test]
-    [Arguments(EventBusAuthenticationType.ManagedIdentity)]
-    [Arguments(EventBusAuthenticationType.ApplicationRegistration)]
-    [Arguments(EventBusAuthenticationType.AzureCli)]
-    public async Task AuthenticationType_CanBeConfigured(EventBusAuthenticationType authenticationType)
+    [Theory]
+    [InlineData(EventBusAuthenticationType.ManagedIdentity)]
+    [InlineData(EventBusAuthenticationType.ApplicationRegistration)]
+    [InlineData(EventBusAuthenticationType.AzureCli)]
+    public void AuthenticationType_CanBeConfigured(EventBusAuthenticationType authenticationType)
     {
         var options = new BusWorksOptions { AuthenticationType = authenticationType };
 
-        await Assert.That(options.AuthenticationType).IsEqualTo(authenticationType);
+        Assert.Equal(authenticationType, options.AuthenticationType);
     }
 
-    [Test]
-    public async Task MaxConcurrentCalls_CanBeOverridden()
+    [Fact]
+    public void MaxConcurrentCalls_CanBeOverridden()
     {
         var options = new BusWorksOptions { MaxConcurrentCalls = 20 };
 
-        await Assert.That(options.MaxConcurrentCalls).IsEqualTo(20);
+        Assert.Equal(20, options.MaxConcurrentCalls);
     }
 
-    [Test]
-    public async Task MaxConcurrentSessions_CanBeOverridden()
+    [Fact]
+    public void MaxConcurrentSessions_CanBeOverridden()
     {
         var options = new BusWorksOptions { MaxConcurrentSessions = 16 };
 
-        await Assert.That(options.MaxConcurrentSessions).IsEqualTo(16);
+        Assert.Equal(16, options.MaxConcurrentSessions);
     }
 
-    [Test]
-    public async Task MaxConcurrentCallsPerSession_CanBeOverridden()
+    [Fact]
+    public void MaxConcurrentCallsPerSession_CanBeOverridden()
     {
         var options = new BusWorksOptions { MaxConcurrentCallsPerSession = 2 };
 
-        await Assert.That(options.MaxConcurrentCallsPerSession).IsEqualTo(2);
+        Assert.Equal(2, options.MaxConcurrentCallsPerSession);
     }
 
-    [Test]
-    [Arguments(EventBusAuthenticationType.ConnectionString, 0)]
-    [Arguments(EventBusAuthenticationType.ManagedIdentity, 1)]
-    [Arguments(EventBusAuthenticationType.ApplicationRegistration, 2)]
-    [Arguments(EventBusAuthenticationType.AzureCli, 3)]
-    public async Task AuthenticationType_IntegerValue_IsStable(EventBusAuthenticationType authenticationType, int expectedValue)
+    [Theory]
+    [InlineData(EventBusAuthenticationType.ConnectionString, 0)]
+    [InlineData(EventBusAuthenticationType.ManagedIdentity, 1)]
+    [InlineData(EventBusAuthenticationType.ApplicationRegistration, 2)]
+    [InlineData(EventBusAuthenticationType.AzureCli, 3)]
+    public void AuthenticationType_IntegerValue_IsStable(EventBusAuthenticationType authenticationType, int expectedValue)
     {
         int value = (int)authenticationType;
 
-        await Assert.That(value).IsEqualTo(expectedValue);
+        Assert.Equal(expectedValue, value);
     }
 
-    [Test]
-    public async Task AuthenticationType_HasExactlyFourValues()
+    [Fact]
+    public void AuthenticationType_HasExactlyFourValues()
     {
-        // Catches unreviewed additions that would alter the config contract.
         int count = Enum.GetValues<EventBusAuthenticationType>().Length;
 
-        await Assert.That(count).IsEqualTo(4);
+        Assert.Equal(4, count);
     }
-    
-    [Test]
-    public async Task ConnectionStringOptions_Default_ConnectionString_IsEmpty()
+
+    [Fact]
+    public void ConnectionStringOptions_Default_ConnectionString_IsEmpty()
     {
         var options = new ConnectionStringOptions();
 
-        await Assert.That(options.ConnectionString).IsEqualTo(string.Empty);
+        Assert.Equal(string.Empty, options.ConnectionString);
     }
 
-    [Test]
-    public async Task ConnectionStringOptions_ConnectionString_CanBeSet()
+    [Fact]
+    public void ConnectionStringOptions_ConnectionString_CanBeSet()
     {
         const string value = "Endpoint=sb://my-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123";
 
         var options = new ConnectionStringOptions { ConnectionString = value };
 
-        await Assert.That(options.ConnectionString).IsEqualTo(value);
+        Assert.Equal(value, options.ConnectionString);
     }
-    
-    [Test]
-    public async Task ManagedIdentityOptions_Defaults_AreCorrect()
+
+    [Fact]
+    public void ManagedIdentityOptions_Defaults_AreCorrect()
     {
-        // Null ClientId signals the system-assigned identity.
-        // A non-null value selects a specific user-assigned identity by its client ID.
         var options = new ManagedIdentityOptions();
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo(string.Empty);
-        await Assert.That(options.ClientId).IsNull();
+        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
+        Assert.Null(options.ClientId);
     }
 
-    [Test]
-    public async Task ManagedIdentityOptions_AllValuesPreserved()
+    [Fact]
+    public void ManagedIdentityOptions_AllValuesPreserved()
     {
         var options = new ManagedIdentityOptions
         {
@@ -117,23 +111,23 @@ public class BusWorksOptionsTests
             ClientId = "00000000-0000-0000-0000-000000000001"
         };
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo("my-namespace.servicebus.windows.net");
-        await Assert.That(options.ClientId).IsEqualTo("00000000-0000-0000-0000-000000000001");
+        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
+        Assert.Equal("00000000-0000-0000-0000-000000000001", options.ClientId);
     }
-    
-    [Test]
-    public async Task ApplicationRegistrationOptions_Defaults_AreCorrect()
+
+    [Fact]
+    public void ApplicationRegistrationOptions_Defaults_AreCorrect()
     {
         var options = new ApplicationRegistrationOptions();
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo(string.Empty);
-        await Assert.That(options.TenantId).IsEqualTo(string.Empty);
-        await Assert.That(options.ClientId).IsEqualTo(string.Empty);
-        await Assert.That(options.ClientSecret).IsEqualTo(string.Empty);
+        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
+        Assert.Equal(string.Empty, options.TenantId);
+        Assert.Equal(string.Empty, options.ClientId);
+        Assert.Equal(string.Empty, options.ClientSecret);
     }
 
-    [Test]
-    public async Task ApplicationRegistrationOptions_AllValuesPreserved()
+    [Fact]
+    public void ApplicationRegistrationOptions_AllValuesPreserved()
     {
         var options = new ApplicationRegistrationOptions
         {
@@ -143,25 +137,25 @@ public class BusWorksOptionsTests
             ClientSecret = "super-secret"
         };
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo("my-namespace.servicebus.windows.net");
-        await Assert.That(options.TenantId).IsEqualTo("00000000-0000-0000-0000-000000000001");
-        await Assert.That(options.ClientId).IsEqualTo("00000000-0000-0000-0000-000000000002");
-        await Assert.That(options.ClientSecret).IsEqualTo("super-secret");
+        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
+        Assert.Equal("00000000-0000-0000-0000-000000000001", options.TenantId);
+        Assert.Equal("00000000-0000-0000-0000-000000000002", options.ClientId);
+        Assert.Equal("super-secret", options.ClientSecret);
     }
-    
-    [Test]
-    public async Task AzureCliOptions_Default_FullyQualifiedNamespace_IsEmpty()
+
+    [Fact]
+    public void AzureCliOptions_Default_FullyQualifiedNamespace_IsEmpty()
     {
         var options = new AzureCliOptions();
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo(string.Empty);
+        Assert.Equal(string.Empty, options.FullyQualifiedNamespace);
     }
 
-    [Test]
-    public async Task AzureCliOptions_FullyQualifiedNamespace_CanBeSet()
+    [Fact]
+    public void AzureCliOptions_FullyQualifiedNamespace_CanBeSet()
     {
         var options = new AzureCliOptions { FullyQualifiedNamespace = "my-namespace.servicebus.windows.net" };
 
-        await Assert.That(options.FullyQualifiedNamespace).IsEqualTo("my-namespace.servicebus.windows.net");
+        Assert.Equal("my-namespace.servicebus.windows.net", options.FullyQualifiedNamespace);
     }
 }

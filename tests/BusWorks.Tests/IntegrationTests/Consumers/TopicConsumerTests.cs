@@ -1,11 +1,11 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.BackgroundServices;
+using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-[NotInParallel]
-[InheritsTests]
-internal sealed partial class TopicConsumerTests
+public sealed partial class TopicConsumerTests
     : ConsumerTestBase<TopicConsumerTests.ParkingSpotStatusChangedEvent>
 {
     private const string TopicName = "parking-spot-status-changed";
@@ -19,13 +19,15 @@ internal sealed partial class TopicConsumerTests
     /// </summary>
     private const string FanOutSubscriptionName = "spot-analytics-tests";
 
+    public TopicConsumerTests(EventBusHostFactory factory) : base(factory) { }
+
     protected override async Task ProvisionEntitiesAsync()
     {
         await EnsureTopicExistsAsync(TopicName);
         await EnsureSubscriptionExistsAsync(TopicName, SubscriptionName, o => o.MaxDeliveryCount = MaxDeliveryCount);
         await EnsureSubscriptionExistsAsync(TopicName, FanOutSubscriptionName);
     }
-    
+
 
     protected override ParkingSpotStatusChangedEvent NewEvent() =>
         new(Guid.NewGuid(), DateTime.UtcNow, "B-07", "Available", "lot_north_a3");
@@ -99,11 +101,12 @@ internal sealed partial class TopicConsumerTests
         ParkingSpotStatusChangedEvent expected,
         ParkingSpotStatusChangedEvent received)
     {
-        await Assert.That(received.Id).IsEqualTo(expected.Id);
-        await Assert.That(received.OccurredOnUtc).IsEqualTo(expected.OccurredOnUtc);
-        await Assert.That(received.SpotCode).IsEqualTo(expected.SpotCode);
-        await Assert.That(received.Status).IsEqualTo(expected.Status);
-        await Assert.That(received.ParkingLotId).IsEqualTo(expected.ParkingLotId);
+        await Task.CompletedTask; // keep async for interface compatibility
+        Assert.Equal(expected.Id, received.Id);
+        Assert.Equal(expected.OccurredOnUtc, received.OccurredOnUtc);
+        Assert.Equal(expected.SpotCode, received.SpotCode);
+        Assert.Equal(expected.Status, received.Status);
+        Assert.Equal(expected.ParkingLotId, received.ParkingLotId);
     }
 
     /// <summary>
@@ -115,7 +118,7 @@ internal sealed partial class TopicConsumerTests
         await DrainSubscriptionAsync(SubscriptionName);
         await DrainSubscriptionAsync(FanOutSubscriptionName);
     }
-    
+
     /// <summary>
     /// Removes all currently available messages from <paramref name="subscriptionName"/>
     /// using <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/> mode.
@@ -137,7 +140,7 @@ internal sealed partial class TopicConsumerTests
         while (batch.Count > 0);
     }
 
-    [Test]
+    [Fact]
     public async Task PublishedMessage_IsDeliveredToAllSubscriptions_Independently()
     {
         // Arrange
@@ -157,18 +160,18 @@ internal sealed partial class TopicConsumerTests
             new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
 
         // Act
-        await PublishAsync(@event);
+        await PublishAsync(@event, TestContext.Current.CancellationToken);
 
         ServiceBusReceivedMessage? fromPrimary =
-            await primaryReceiver.ReceiveMessageAsync(ReceiveTimeout);
+            await primaryReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
         ServiceBusReceivedMessage? fromFanOut =
-            await fanOutReceiver.ReceiveMessageAsync(ReceiveTimeout);
+            await fanOutReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
         // Assert — both subscriptions received an independent copy of the same message.
-        await Assert.That(fromPrimary).IsNotNull();
-        await Assert.That(fromFanOut).IsNotNull();
-        await Assert.That(fromPrimary!.MessageId).IsEqualTo(@event.Id.ToString());
-        await Assert.That(fromFanOut!.MessageId).IsEqualTo(@event.Id.ToString());
+        Assert.NotNull(fromPrimary);
+        Assert.NotNull(fromFanOut);
+        Assert.Equal(@event.Id.ToString(), fromPrimary.MessageId);
+        Assert.Equal(@event.Id.ToString(), fromFanOut.MessageId);
     }
 }

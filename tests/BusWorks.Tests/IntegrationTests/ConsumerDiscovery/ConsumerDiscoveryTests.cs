@@ -1,6 +1,6 @@
 using BusWorks.Abstractions.Consumer;
-using BusWorks.Consumer;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;
 
@@ -9,8 +9,10 @@ namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;
 /// discovery correctly — using the exact same scanning predicate that
 /// <c>ServiceBusProcessorBackgroundService</c> runs at application startup.
 /// </summary>
-internal sealed partial class ConsumerDiscoveryTests : TestBase
+public sealed partial class ConsumerDiscoveryTests : TestBase
 {
+    public ConsumerDiscoveryTests(EventBusHostFactory factory) : base(factory) { }
+
     /// <summary>
     /// Delegates directly to <see cref="ServiceBusAssemblyRegistry.GetConsumerTypes"/>, 
     /// which mirrors what the background service calls at startup.
@@ -23,18 +25,18 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
         return registry.GetConsumerTypes();
     }
 
-    [Test]
-    public async Task ConcreteConsumer_InTestAssembly_IsDiscovered()
+    [Fact]
+    public void ConcreteConsumer_InTestAssembly_IsDiscovered()
     {
         // Act
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        await Assert.That(discovered.Contains(typeof(ConcreteIntegrationConsumer))).IsTrue();
+        Assert.Contains(typeof(ConcreteIntegrationConsumer), discovered);
     }
 
-    [Test]
-    public async Task AbstractConsumer_IsExcludedFromDiscovery()
+    [Fact]
+    public void AbstractConsumer_IsExcludedFromDiscovery()
     {
         // Abstract types cannot be instantiated — they must never reach the processor setup.
 
@@ -42,11 +44,11 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        await Assert.That(discovered.Contains(typeof(AbstractIntegrationConsumer))).IsFalse();
+        Assert.DoesNotContain(typeof(AbstractIntegrationConsumer), discovered);
     }
 
-    [Test]
-    public async Task NonConsumerClass_IsExcludedFromDiscovery()
+    [Fact]
+    public void NonConsumerClass_IsExcludedFromDiscovery()
     {
         // A plain class that does not implement IConsumer<T> must be excluded.
 
@@ -54,11 +56,11 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
         IReadOnlyList<Type> discovered = DiscoverConsumers();
 
         // Assert
-        await Assert.That(discovered.Contains(typeof(NotAConsumer))).IsFalse();
+        Assert.DoesNotContain(typeof(NotAConsumer), discovered);
     }
 
-    [Test]
-    public async Task AllDiscoveredConsumers_ImplementIConsumerOfT()
+    [Fact]
+    public void AllDiscoveredConsumers_ImplementIConsumerOfT()
     {
         // Every discovered type must implement the IConsumer<T> contract so the
         // background service can resolve and invoke them safely.
@@ -73,12 +75,12 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
                 .GetInterfaces()
                 .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IConsumer<>));
 
-            await Assert.That(implementsIConsumer).IsTrue();
+            Assert.True(implementsIConsumer);
         }
     }
 
-    [Test]
-    public async Task AllDiscoveredConsumers_AreConcrete_NotAbstract()
+    [Fact]
+    public void AllDiscoveredConsumers_AreConcrete_NotAbstract()
     {
         // The background service resolves consumers from DI — abstract types would
         // throw at resolution time, so they must be filtered out at the scanning stage.
@@ -89,12 +91,12 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
         // Assert
         foreach (Type consumerType in discovered)
         {
-            await Assert.That(consumerType.IsAbstract).IsFalse();
+            Assert.False(consumerType.IsAbstract);
         }
     }
 
-    [Test]
-    public async Task AllDiscoveredConsumers_AreClasses_NotInterfacesOrValueTypes()
+    [Fact]
+    public void AllDiscoveredConsumers_AreClasses_NotInterfacesOrValueTypes()
     {
         // Act
         IReadOnlyList<Type> discovered = DiscoverConsumers();
@@ -102,7 +104,7 @@ internal sealed partial class ConsumerDiscoveryTests : TestBase
         // Assert
         foreach (Type consumerType in discovered)
         {
-            await Assert.That(consumerType.IsClass).IsTrue();
+            Assert.True(consumerType.IsClass);
         }
     }
 }

@@ -4,7 +4,6 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 using Testcontainers.MsSql;
 using Testcontainers.ServiceBus;
-using TUnit.Core.Interfaces;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
@@ -17,8 +16,7 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// Entity provisioning (queues, topics, subscriptions) is intentionally <b>not</b> done here —
 /// each test class declares the entities it needs by overriding <c>EventBusTestBase.ProvisionEntitiesAsync</c>.
 /// </remarks>
-internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsyncDisposable
-{
+public sealed class AzureServiceBusEmulatorContainer{
     /// <summary>AMQP port used by <see cref="ServiceBusClient"/> for messaging.</summary>
     private const ushort AmqpPort = 5672;
 
@@ -85,8 +83,6 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
         //     .Build();
     }
     
-
-    /// <inheritdoc />
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
@@ -107,10 +103,7 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
         Client = new ServiceBusClient(ConnectionString);
         _adminClient = new ServiceBusAdministrationClient(adminConnectionString);
     }
-
-    // ── IAsyncDisposable ──────────────────────────────────────────────────────
-
-    /// <inheritdoc />
+    
     public async ValueTask DisposeAsync()
     {
         await Client.DisposeAsync();

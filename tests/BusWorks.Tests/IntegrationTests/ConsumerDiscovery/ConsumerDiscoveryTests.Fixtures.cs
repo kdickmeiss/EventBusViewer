@@ -6,7 +6,7 @@ using BusWorks.Consumer;
 
 namespace BusWorks.Tests.IntegrationTests.ConsumerDiscovery;
 
-internal sealed partial class ConsumerDiscoveryTests
+public sealed partial class ConsumerDiscoveryTests
 {
     [QueueRoute("integration-test-queue")]
     private sealed record IntegrationQueueEvent(Guid Id, DateTime OccurredOnUtc)

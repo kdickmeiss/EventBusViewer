@@ -6,11 +6,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Trace;
-using TUnit.Core.Interfaces;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
-internal sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
+public sealed class EventBusHostFactory : IAsyncLifetime
 {
     /// <summary>
     /// The emulator fixture that manages the container and all entity provisioning.
@@ -18,14 +18,14 @@ internal sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
     /// <see cref="AzureServiceBusEmulatorContainer.Client"/> without re-creating a client.
     /// </summary>
     public AzureServiceBusEmulatorContainer Emulator { get; } = new();
-    
+
     /// <summary>The DI container for the built (not started) test host.</summary>
     public IServiceProvider Services => _host.Services;
 
     private IHost _host = null!;
 
     /// <inheritdoc />
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Start the emulator container and provision all entities first so that any
         // component resolved from the DI container can immediately communicate with
@@ -63,11 +63,11 @@ internal sealed class EventBusHostFactory : IAsyncInitializer, IAsyncDisposable
                 // but never exported anywhere during tests.
                 services.AddSingleton(
                     TracerProvider.Default.GetTracer("EventBus.AzureServiceBus.Tests"));
-                
+
             })
             .Build();
     }
-    
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {

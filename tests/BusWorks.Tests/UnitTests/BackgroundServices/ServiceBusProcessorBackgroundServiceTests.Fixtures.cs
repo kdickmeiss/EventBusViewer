@@ -5,7 +5,7 @@ using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
-internal sealed partial class ServiceBusProcessorBackgroundServiceTests
+public sealed partial class ServiceBusProcessorBackgroundServiceTests
 {
     // ── Message types ─────────────────────────────────────────────────────────
 

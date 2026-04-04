@@ -1,14 +1,16 @@
 ﻿using Azure.Messaging.ServiceBus;
 using BusWorks.BackgroundServices;
+using BusWorks.Tests.IntegrationTests.BuildingBlocks;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-[NotInParallel]
-[InheritsTests]
-internal sealed partial class QueueConsumerTests
+public sealed partial class QueueConsumerTests
     : ConsumerTestBase<QueueConsumerTests.ParkingReservationCreatedEvent>
 {
     private const string QueueName = "parking-reservation-created";
+
+    public QueueConsumerTests(EventBusHostFactory factory) : base(factory) { }
 
     protected override async Task ProvisionEntitiesAsync()
     {
@@ -80,14 +82,15 @@ internal sealed partial class QueueConsumerTests
         ParkingReservationCreatedEvent expected,
         ParkingReservationCreatedEvent received)
     {
-        await Assert.That(received.Id).IsEqualTo(expected.Id);
-        await Assert.That(received.OccurredOnUtc).IsEqualTo(expected.OccurredOnUtc);
-        await Assert.That(received.SpotCode).IsEqualTo(expected.SpotCode);
-        await Assert.That(received.UserId).IsEqualTo(expected.UserId);
-        await Assert.That(received.HourlyRate).IsEqualTo(expected.HourlyRate);
+        await Task.CompletedTask; // keep the method async for interface compatibility
+        Assert.Equal(expected.Id, received.Id);
+        Assert.Equal(expected.OccurredOnUtc, received.OccurredOnUtc);
+        Assert.Equal(expected.SpotCode, received.SpotCode);
+        Assert.Equal(expected.UserId, received.UserId);
+        Assert.Equal(expected.HourlyRate, received.HourlyRate);
     }
 
-    [Test]
+    [Fact]
     public async Task Consumer_Deserializes_RawMessage_WithMixedCasePropertyNames()
     {
         // Arrange
@@ -109,30 +112,30 @@ internal sealed partial class QueueConsumerTests
         {
             ContentType = "application/json",
             MessageId = expectedId.ToString()
-        });
+        }, TestContext.Current.CancellationToken);
 
         await using ServiceBusReceiver receiver = Emulator.Client.CreateReceiver(
             QueueName,
             new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
 
         // Act
-        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(ReceiveTimeout);
+        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-        await Assert.That(raw).IsNotNull();
+        Assert.NotNull(raw);
 
         var tcs = new TaskCompletionSource<ParkingReservationCreatedEvent>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var consumer = new CapturingParkingReservationConsumer(tcs);
         Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
             ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
-        await processor(raw!, CancellationToken.None);
+        await processor(raw, CancellationToken.None);
 
         ParkingReservationCreatedEvent received = await tcs.Task;
 
         // Assert
-        await Assert.That(received.Id).IsEqualTo(expectedId);
-        await Assert.That(received.SpotCode).IsEqualTo("B-07");
-        await Assert.That(received.UserId).IsEqualTo("usr_casetest");
-        await Assert.That(received.HourlyRate).IsEqualTo(5.00m);
+        Assert.Equal(expectedId, received.Id);
+        Assert.Equal("B-07", received.SpotCode);
+        Assert.Equal("usr_casetest", received.UserId);
+        Assert.Equal(5.00m, received.HourlyRate);
     }
 }

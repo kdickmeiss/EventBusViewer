@@ -3,18 +3,19 @@ using Azure.Messaging.ServiceBus.Administration;
 using BusWorks.Abstractions;
 using BusWorks.Abstractions.Events;
 using Microsoft.Extensions.DependencyInjection;
-using TUnit.Core.Interfaces;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
-internal abstract class TestBase : IAsyncInitializer
+[Collection("IntegrationTests")]
+public abstract class TestBase : IAsyncLifetime
 {
     /// <summary>
-    /// Shared factory instance for the full test session.
-    /// TUnit injects this automatically — do not create a new instance manually.
+    /// Shared factory instance for the full test collection.
+    /// xUnit injects this automatically via constructor — the same instance is reused
+    /// across all tests in the <c>IntegrationTests</c> collection.
     /// </summary>
-    [ClassDataSource<EventBusHostFactory>(Shared = SharedType.PerTestSession)]
-    public required EventBusHostFactory Factory { get; init; } = null!;
+    protected EventBusHostFactory Factory { get; }
 
     /// <summary>The DI container built by the host.</summary>
     private IServiceProvider Services => Factory.Services;
@@ -24,6 +25,11 @@ internal abstract class TestBase : IAsyncInitializer
     /// (e.g. sending a raw <see cref="ServiceBusMessage"/> and then asserting a consumer received it).
     /// </summary>
     public AzureServiceBusEmulatorContainer Emulator => Factory.Emulator;
+
+    protected TestBase(EventBusHostFactory factory)
+    {
+        Factory = factory;
+    }
 
     /// <summary>Resolves a required service from the shared DI container.</summary>
     protected T GetRequiredService<T>() where T : notnull =>
@@ -36,20 +42,22 @@ internal abstract class TestBase : IAsyncInitializer
     protected Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
         where TEvent : IIntegrationEvent =>
         GetRequiredService<IEventBusPublisher>().PublishAsync(@event, cancellationToken);
-    
+
     /// <summary>
-    /// TUnit lifecycle hook — sealed so derived classes cannot accidentally bypass
+    /// xUnit lifecycle hook — sealed so derived classes cannot accidentally bypass
     /// entity provisioning. Override <see cref="ProvisionEntitiesAsync"/> instead.
     /// </summary>
-    public Task InitializeAsync() => ProvisionEntitiesAsync();
+    public async ValueTask InitializeAsync() => await ProvisionEntitiesAsync();
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Override to create the queues, topics, or subscriptions the test class requires.
-    /// Called automatically by TUnit before the first test in the class runs.
+    /// Called automatically by xUnit before each test in the class.
+    /// Entity creation methods are idempotent — they check existence before creating.
     /// </summary>
     protected virtual Task ProvisionEntitiesAsync() => Task.CompletedTask;
-    
-    // ...existing code...
 
     protected async Task EnsureQueueExistsAsync(
         string queueName,

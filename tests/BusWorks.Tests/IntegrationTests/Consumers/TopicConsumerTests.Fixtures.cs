@@ -6,7 +6,7 @@ using BusWorks.Consumer;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-internal sealed partial class TopicConsumerTests
+public sealed partial class TopicConsumerTests
 {
     /// <summary>
     /// Represents a parking-spot status change broadcast to all interested services.
@@ -18,7 +18,7 @@ internal sealed partial class TopicConsumerTests
     /// references it for consumer setup.
     /// </summary>
     [TopicRoute(TopicName)]
-    internal sealed record ParkingSpotStatusChangedEvent(
+    public sealed record ParkingSpotStatusChangedEvent(
         Guid Id,
         DateTime OccurredOnUtc,
         string SpotCode,

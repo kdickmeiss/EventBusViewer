@@ -1,10 +1,9 @@
-using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 
-internal sealed partial class ServiceBusConsumerTests
+public sealed partial class ServiceBusConsumerTests
 {
     private sealed record TestEvent(Guid Id, DateTime OccurredOnUtc, string? Name, int Value)
         : IIntegrationEvent;

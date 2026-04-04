@@ -5,6 +5,7 @@ using BusWorks.Publisher;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
+using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.ServiceRegistration;
 
@@ -13,135 +14,111 @@ namespace BusWorks.Tests.IntegrationTests.ServiceRegistration;
 /// container.
 /// </summary>
 /// <remarks>
-/// A single <see cref="EventBusHostFactory"/> is shared for the entire test session
-/// (<see cref="SharedType.PerTestSession"/>), mirroring xUnit's <c>ICollectionFixture&lt;T&gt;</c>
-/// pattern. The host is built once; all tests resolve services from the same container.
+/// A single <see cref="EventBusHostFactory"/> is shared for the entire test collection
+/// via <see cref="ICollectionFixture{TFixture}"/>, mirroring TUnit's
+/// <c>SharedType.PerTestSession</c> pattern. The host is built once; all tests resolve
+/// services from the same container.
 /// </remarks>
-internal sealed class ServiceRegistrationTests : TestBase
+public sealed class ServiceRegistrationTests : TestBase
 {
-    [Test]
-    public async Task IEventBusPublisher_IsRegistered_AndResolvesSuccessfully()
+    public ServiceRegistrationTests(EventBusHostFactory factory) : base(factory) { }
+
+    [Fact]
+    public void IEventBusPublisher_IsRegistered_AndResolvesSuccessfully()
     {
-        // Act
         IEventBusPublisher publisher = GetRequiredService<IEventBusPublisher>();
 
-        // Assert
-        await Assert.That(publisher).IsNotNull();
+        Assert.NotNull(publisher);
     }
 
-    [Test]
-    public async Task IEventBusPublisher_ResolvesToServiceBusPublisher()
+    [Fact]
+    public void IEventBusPublisher_ResolvesToServiceBusPublisher()
     {
         // ServiceBusPublisher is internal — visible here via InternalsVisibleTo.
-
-        // Act
         IEventBusPublisher publisher = GetRequiredService<IEventBusPublisher>();
 
-        // Assert
-        await Assert.That(publisher is ServiceBusPublisher).IsTrue();
+        Assert.IsType<ServiceBusPublisher>(publisher);
     }
 
-    [Test]
-    public async Task IEventBusPublisher_IsRegisteredAsSingleton_ReturnsSameInstanceOnEveryResolve()
+    [Fact]
+    public void IEventBusPublisher_IsRegisteredAsSingleton_ReturnsSameInstanceOnEveryResolve()
     {
-        // Act
         IEventBusPublisher first = GetRequiredService<IEventBusPublisher>();
         IEventBusPublisher second = GetRequiredService<IEventBusPublisher>();
 
-        // Assert
-        await Assert.That(ReferenceEquals(first, second)).IsTrue();
+        Assert.Same(first, second);
     }
-    
-    [Test]
-    public async Task ServiceBusClient_IsRegistered_AndResolvesSuccessfully()
+
+    [Fact]
+    public void ServiceBusClient_IsRegistered_AndResolvesSuccessfully()
     {
-        // Act
         ServiceBusClient client = GetRequiredService<ServiceBusClient>();
 
-        // Assert
-        await Assert.That(client).IsNotNull();
+        Assert.NotNull(client);
     }
 
-    [Test]
-    public async Task ServiceBusClient_IsRegisteredAsSingleton_ReturnsSameInstanceOnEveryResolve()
+    [Fact]
+    public void ServiceBusClient_IsRegisteredAsSingleton_ReturnsSameInstanceOnEveryResolve()
     {
-        // Act
         ServiceBusClient first = GetRequiredService<ServiceBusClient>();
         ServiceBusClient second = GetRequiredService<ServiceBusClient>();
 
-        // Assert
-        await Assert.That(ReferenceEquals(first, second)).IsTrue();
+        Assert.Same(first, second);
     }
 
-    [Test]
-    public async Task ServiceBusAssemblyRegistry_IsRegistered_AndResolvesSuccessfully()
+    [Fact]
+    public void ServiceBusAssemblyRegistry_IsRegistered_AndResolvesSuccessfully()
     {
-        // Act
         ServiceBusAssemblyRegistry registry = GetRequiredService<ServiceBusAssemblyRegistry>();
 
-        // Assert
-        await Assert.That(registry).IsNotNull();
+        Assert.NotNull(registry);
     }
-    
-    [Test]
-    public async Task Tracer_IsRegistered_AndResolvesSuccessfully()
+
+    [Fact]
+    public void Tracer_IsRegistered_AndResolvesSuccessfully()
     {
-        // Act
         Tracer tracer = GetRequiredService<Tracer>();
 
-        // Assert
-        await Assert.That(tracer).IsNotNull();
-    }
-    
-    [Test]
-    public async Task EventBusOptions_AuthenticationType_BindsFromConfiguration()
-    {
-        // Act
-        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
-
-        // Assert
-        await Assert.That(options.Value.AuthenticationType)
-            .IsEqualTo(EventBusAuthenticationType.ConnectionString);
+        Assert.NotNull(tracer);
     }
 
-    [Test]
-    public async Task EventBusOptions_ConnectionString_BindsFromConfiguration()
+    [Fact]
+    public void EventBusOptions_AuthenticationType_BindsFromConfiguration()
     {
-        // Act
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        // Assert
-        await Assert.That(options.Value.ConnectionString?.ConnectionString)
-            .IsEqualTo(Emulator.ConnectionString);
+        Assert.Equal(EventBusAuthenticationType.ConnectionString, options.Value.AuthenticationType);
     }
 
-    [Test]
-    public async Task EventBusOptions_MaxConcurrentCalls_BindsFromConfiguration()
+    [Fact]
+    public void EventBusOptions_ConnectionString_BindsFromConfiguration()
     {
-        // Act
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        // Assert
-        await Assert.That(options.Value.MaxConcurrentCalls).IsEqualTo(10);
+        Assert.Equal(Emulator.ConnectionString, options.Value.ConnectionString?.ConnectionString);
     }
 
-    [Test]
-    public async Task EventBusOptions_MaxConcurrentSessions_BindsFromConfiguration()
+    [Fact]
+    public void EventBusOptions_MaxConcurrentCalls_BindsFromConfiguration()
     {
-        // Act
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        // Assert
-        await Assert.That(options.Value.MaxConcurrentSessions).IsEqualTo(8);
+        Assert.Equal(10, options.Value.MaxConcurrentCalls);
     }
 
-    [Test]
-    public async Task EventBusOptions_MaxConcurrentCallsPerSession_BindsFromConfiguration()
+    [Fact]
+    public void EventBusOptions_MaxConcurrentSessions_BindsFromConfiguration()
     {
-        // Act
         IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
 
-        // Assert
-        await Assert.That(options.Value.MaxConcurrentCallsPerSession).IsEqualTo(1);
+        Assert.Equal(8, options.Value.MaxConcurrentSessions);
+    }
+
+    [Fact]
+    public void EventBusOptions_MaxConcurrentCallsPerSession_BindsFromConfiguration()
+    {
+        IOptions<BusWorksOptions> options = GetRequiredService<IOptions<BusWorksOptions>>();
+
+        Assert.Equal(1, options.Value.MaxConcurrentCallsPerSession);
     }
 }

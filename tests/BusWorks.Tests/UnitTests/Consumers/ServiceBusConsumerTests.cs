@@ -5,52 +5,51 @@ using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 using BusWorks.BackgroundServices;
 using BusWorks.Consumer;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 
-internal sealed partial class ServiceBusConsumerTests
+public sealed partial class ServiceBusConsumerTests
 {
-    [Test]
-    public async Task SharedJsonSerializerOptions_PropertyNameCaseInsensitive_IsTrue()
+    [Fact]
+    public void SharedJsonSerializerOptions_PropertyNameCaseInsensitive_IsTrue()
     {
         bool isCaseInsensitive = ServiceBusConsumerDefaults.JsonSerializerOptions.PropertyNameCaseInsensitive;
 
-        await Assert.That(isCaseInsensitive).IsTrue();
+        Assert.True(isCaseInsensitive);
     }
 
-    [Test]
-    public async Task SharedJsonSerializerOptions_ReturnsSameInstanceOnEachAccess()
+    [Fact]
+    public void SharedJsonSerializerOptions_ReturnsSameInstanceOnEachAccess()
     {
         // The instance must be cached — creating a new JsonSerializerOptions on every
         // access would discard JsonSerializer's internal reflection cache and regress performance.
-        JsonSerializerOptions first  = ServiceBusConsumerDefaults.JsonSerializerOptions;
+        JsonSerializerOptions first = ServiceBusConsumerDefaults.JsonSerializerOptions;
         JsonSerializerOptions second = ServiceBusConsumerDefaults.JsonSerializerOptions;
 
-        await Assert.That(ReferenceEquals(first, second)).IsTrue();
+        Assert.Same(first, second);
     }
 
-    [Test]
+    [Fact]
     public async Task ValidBody_DeserializesMessage_AndCallsConsume()
     {
-        var id         = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var occurredOn = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
-        var body       = BinaryData.FromObjectAsJson(new TestEvent(id, occurredOn, "park-opened", 42));
+        var body = BinaryData.FromObjectAsJson(new TestEvent(id, occurredOn, "park-opened", 42));
         ServiceBusReceivedMessage raw = CreateMessage(body);
         var consumer = new TrackingConsumer();
 
-        await InvokeAsync(consumer, raw);
+        await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.ReceivedMessage).IsNotNull();
-        await Assert.That(consumer.ReceivedMessage!.Id).IsEqualTo(id);
-        await Assert.That(consumer.ReceivedMessage.Name).IsEqualTo("park-opened");
-        await Assert.That(consumer.ReceivedMessage.Value).IsEqualTo(42);
+        Assert.NotNull(consumer.ReceivedMessage);
+        Assert.Equal(id, consumer.ReceivedMessage!.Id);
+        Assert.Equal("park-opened", consumer.ReceivedMessage.Name);
+        Assert.Equal(42, consumer.ReceivedMessage.Value);
     }
 
-    [Test]
+    [Fact]
     public async Task ValidBody_ForwardsMetadata_AndCancellationToken()
     {
-        // The framework maps ServiceBusReceivedMessage → MessageContext before calling Consume.
-        // Verify the mapping is applied and the token is forwarded unchanged.
         var body = BinaryData.FromObjectAsJson(new TestEvent(Guid.NewGuid(), DateTime.UtcNow, "test", 1));
         ServiceBusReceivedMessage raw = CreateMessage(body, messageId: "msg-forward");
         var consumer = new TrackingConsumer();
@@ -58,58 +57,55 @@ internal sealed partial class ServiceBusConsumerTests
 
         await InvokeAsync(consumer, raw, cts.Token);
 
-        await Assert.That(consumer.ReceivedMetadata).IsNotNull();
-        await Assert.That(consumer.ReceivedMetadata!.MessageId).IsEqualTo("msg-forward");
-        await Assert.That(consumer.ReceivedCancellationToken).IsEqualTo(cts.Token);
+        Assert.NotNull(consumer.ReceivedMetadata);
+        Assert.Equal("msg-forward", consumer.ReceivedMetadata!.MessageId);
+        Assert.Equal(cts.Token, consumer.ReceivedCancellationToken);
     }
 
-    [Test]
+    [Fact]
     public async Task CaseInsensitiveJson_IsDeserializedCorrectly()
     {
-        // The default options have PropertyNameCaseInsensitive = true, so lowercase property
-        // names in JSON must match PascalCase C# properties.
         const string json = """
-            {"id":"11111111-1111-1111-1111-111111111111","occurredonutc":"2026-01-01T12:00:00Z","name":"park-opened","value":99}
-            """;
+                            {"id":"11111111-1111-1111-1111-111111111111","occurredonutc":"2026-01-01T12:00:00Z","name":"park-opened","value":99}
+                            """;
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString(json));
         var consumer = new TrackingConsumer();
 
-        await InvokeAsync(consumer, raw);
+        await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.ReceivedMessage!.Name).IsEqualTo("park-opened");
-        await Assert.That(consumer.ReceivedMessage.Value).IsEqualTo(99);
+        Assert.Equal("park-opened", consumer.ReceivedMessage!.Name);
+        Assert.Equal(99, consumer.ReceivedMessage.Value);
     }
 
-    [Test]
+    [Fact]
     public async Task NullDeserializationResult_ThrowsInvalidOperationException_WithMessageIdAndTypeName()
     {
-        // The JSON literal "null" deserializes reference types to null — must be rejected.
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("null"), messageId: "msg-null");
         var consumer = new TrackingConsumer();
 
         InvalidOperationException? exception = null;
-        try { await InvokeAsync(consumer, raw); }
+        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
-        await Assert.That(exception!.Message.Contains("msg-null")).IsTrue();
-        await Assert.That(exception.Message.Contains(nameof(TestEvent))).IsTrue();
+        Assert.NotNull(exception);
+        Assert.Contains("msg-null", exception.Message);
+        Assert.Contains(nameof(TestEvent), exception.Message);
     }
 
-    [Test]
+    [Fact]
     public async Task InvalidJson_PropagatesJsonException()
     {
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("{not valid json}"));
         var consumer = new TrackingConsumer();
 
         JsonException? exception = null;
-        try { await InvokeAsync(consumer, raw); }
+        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
         catch (JsonException ex) { exception = ex; }
 
-        await Assert.That(exception).IsNotNull();
+        Assert.NotNull(exception);
     }
 
-    [Test]
+    [Fact]
     public async Task ExceptionInConsume_PropagatesOut()
     {
         var body = BinaryData.FromObjectAsJson(new TestEvent(Guid.NewGuid(), DateTime.UtcNow, "test", 1));
@@ -117,12 +113,12 @@ internal sealed partial class ServiceBusConsumerTests
         var consumer = new FaultingConsumer();
 
         InvalidOperationException? exception = null;
-        try { await InvokeAsync(consumer, raw); }
+        try { await InvokeAsync(consumer, raw, TestContext.Current.CancellationToken); }
         catch (InvalidOperationException ex) { exception = ex; }
 
-        await Assert.That(exception).IsEqualTo(FaultingConsumer.Error);
+        Assert.Equal(FaultingConsumer.Error, exception);
     }
-    
+
     private static ServiceBusReceivedMessage CreateMessage(BinaryData body, string messageId = "msg-1") =>
         ServiceBusModelFactory.ServiceBusReceivedMessage(body: body, messageId: messageId);
 
@@ -137,7 +133,8 @@ internal sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage message,
         CancellationToken ct = default) where T : class, IIntegrationEvent
     {
-        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor = ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
+        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
+            ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
         return processor(message, ct);
     }
 }

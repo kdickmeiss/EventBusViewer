@@ -5,7 +5,7 @@ using BusWorks.Abstractions.Events;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-internal sealed partial class QueueConsumerTests
+public sealed partial class QueueConsumerTests
 {
     /// <summary>
     /// Domain-realistic event used as the message type for all queue consumer tests.
@@ -14,7 +14,7 @@ internal sealed partial class QueueConsumerTests
     /// on <see cref="CapturingParkingReservationConsumer"/> resolves it for consumer setup.
     /// </summary>
     [QueueRoute(QueueName)]
-    internal sealed record ParkingReservationCreatedEvent(
+    public sealed record ParkingReservationCreatedEvent(
         Guid Id,
         DateTime OccurredOnUtc,
         string SpotCode,

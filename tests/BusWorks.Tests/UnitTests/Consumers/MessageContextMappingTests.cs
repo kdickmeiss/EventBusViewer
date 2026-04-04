@@ -3,6 +3,7 @@ using BusWorks.Abstractions;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 using BusWorks.BackgroundServices;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 
@@ -11,7 +12,7 @@ namespace BusWorks.Tests.UnitTests.Consumers;
 /// correctly maps every property from <see cref="ServiceBusReceivedMessage"/>
 /// to <see cref="MessageContext"/> before calling <see cref="IConsumer{T}.Consume"/>.
 /// </summary>
-internal sealed class MessageContextMappingTests
+public sealed class MessageContextMappingTests
 {
     // A minimal event type — the content does not matter for metadata mapping tests.
     private sealed record MetadataEvent(Guid Id, DateTime OccurredOnUtc) : IIntegrationEvent;
@@ -28,89 +29,89 @@ internal sealed class MessageContextMappingTests
         }
     }
 
-    [Test]
+    [Fact]
     public async Task MessageId_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(messageId: "test-message-id"));
+        await InvokeAsync(consumer, CreateMessage(messageId: "test-message-id"), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.MessageId).IsEqualTo("test-message-id");
+        Assert.Equal("test-message-id", consumer.CapturedMetadata!.MessageId);
     }
 
-    [Test]
+    [Fact]
     public async Task SessionId_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(sessionId: "session-42"));
+        await InvokeAsync(consumer, CreateMessage(sessionId: "session-42"), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.SessionId).IsEqualTo("session-42");
+        Assert.Equal("session-42", consumer.CapturedMetadata!.SessionId);
     }
 
-    [Test]
+    [Fact]
     public async Task SessionId_IsNull_WhenNotSetOnBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage());
+        await InvokeAsync(consumer, CreateMessage(), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.SessionId).IsNull();
+        Assert.Null(consumer.CapturedMetadata!.SessionId);
     }
 
-    [Test]
+    [Fact]
     public async Task CorrelationId_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(correlationId: "corr-999"));
+        await InvokeAsync(consumer, CreateMessage(correlationId: "corr-999"), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.CorrelationId).IsEqualTo("corr-999");
+        Assert.Equal("corr-999", consumer.CapturedMetadata!.CorrelationId);
     }
 
-    [Test]
+    [Fact]
     public async Task DeliveryCount_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(deliveryCount: 3));
+        await InvokeAsync(consumer, CreateMessage(deliveryCount: 3), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.DeliveryCount).IsEqualTo(3);
+        Assert.Equal(3, consumer.CapturedMetadata!.DeliveryCount);
     }
 
-    [Test]
+    [Fact]
     public async Task SequenceNumber_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(sequenceNumber: 1_000_001));
+        await InvokeAsync(consumer, CreateMessage(sequenceNumber: 1_000_001), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.SequenceNumber).IsEqualTo(1_000_001);
+        Assert.Equal(1_000_001, consumer.CapturedMetadata!.SequenceNumber);
     }
 
-    [Test]
+    [Fact]
     public async Task EnqueuedTime_IsMappedFromBrokerMessage()
     {
         var enqueued = new DateTimeOffset(2026, 4, 1, 10, 0, 0, TimeSpan.Zero);
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(enqueuedTime: enqueued));
+        await InvokeAsync(consumer, CreateMessage(enqueuedTime: enqueued), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.EnqueuedTime).IsEqualTo(enqueued);
+        Assert.Equal(enqueued, consumer.CapturedMetadata!.EnqueuedTime);
     }
 
-    [Test]
+    [Fact]
     public async Task ContentType_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(contentType: "application/json"));
+        await InvokeAsync(consumer, CreateMessage(contentType: "application/json"), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.ContentType).IsEqualTo("application/json");
+        Assert.Equal("application/json", consumer.CapturedMetadata!.ContentType);
     }
 
-    [Test]
+    [Fact]
     public async Task Subject_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(subject: "parking.reservation.created"));
+        await InvokeAsync(consumer, CreateMessage(subject: "parking.reservation.created"), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.Subject).IsEqualTo("parking.reservation.created");
+        Assert.Equal("parking.reservation.created", consumer.CapturedMetadata!.Subject);
     }
 
-    [Test]
+    [Fact]
     public async Task ApplicationProperties_AreMappedFromBrokerMessage()
     {
         var props = new Dictionary<string, object>
@@ -119,56 +120,50 @@ internal sealed class MessageContextMappingTests
             ["traceparent"] = "00-abc123-def456-01"
         };
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(applicationProperties: props));
+        await InvokeAsync(consumer, CreateMessage(applicationProperties: props), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.ApplicationProperties["EventType"])
-            .IsEqualTo("ParkingReservationCreated");
-        await Assert.That(consumer.CapturedMetadata.ApplicationProperties["traceparent"])
-            .IsEqualTo("00-abc123-def456-01");
+        Assert.Equal("ParkingReservationCreated", consumer.CapturedMetadata!.ApplicationProperties["EventType"]);
+        Assert.Equal("00-abc123-def456-01", consumer.CapturedMetadata.ApplicationProperties["traceparent"]);
     }
 
-    [Test]
+    [Fact]
     public async Task ApplicationProperties_IsEmpty_NotNull_WhenNoneSetOnBrokerMessage()
     {
-        // Consumers that access ApplicationProperties must never see null —
-        // MessageContext guarantees an empty dictionary when the sender set nothing.
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage());
+        await InvokeAsync(consumer, CreateMessage(), TestContext.Current.CancellationToken);
 
-        await Assert.That(consumer.CapturedMetadata!.ApplicationProperties).IsNotNull();
-        await Assert.That(consumer.CapturedMetadata.ApplicationProperties.Count).IsEqualTo(0);
+        Assert.NotNull(consumer.CapturedMetadata!.ApplicationProperties);
+        Assert.Empty(consumer.CapturedMetadata.ApplicationProperties);
     }
 
-    [Test]
+    [Fact]
     public async Task AllMetadataProperties_AreMappedInOneMessage()
     {
-        // Smoke test: a single message with every property set — verifies nothing is
-        // accidentally overwritten when all fields are populated simultaneously.
         var enqueued = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero);
         var props = new Dictionary<string, object> { ["k"] = "v" };
 
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(
-            messageId:           "full-msg",
-            sessionId:           "full-session",
-            correlationId:       "full-corr",
-            deliveryCount:       2,
-            sequenceNumber:      42L,
-            enqueuedTime:        enqueued,
-            contentType:         "application/json",
-            subject:             "full-subject",
-            applicationProperties: props));
+            messageId:             "full-msg",
+            sessionId:             "full-session",
+            correlationId:         "full-corr",
+            deliveryCount:         2,
+            sequenceNumber:        42L,
+            enqueuedTime:          enqueued,
+            contentType:           "application/json",
+            subject:               "full-subject",
+            applicationProperties: props), TestContext.Current.CancellationToken);
 
         MessageContext md = consumer.CapturedMetadata!;
-        await Assert.That(md.MessageId).IsEqualTo("full-msg");
-        await Assert.That(md.SessionId).IsEqualTo("full-session");
-        await Assert.That(md.CorrelationId).IsEqualTo("full-corr");
-        await Assert.That(md.DeliveryCount).IsEqualTo(2);
-        await Assert.That(md.SequenceNumber).IsEqualTo(42L);
-        await Assert.That(md.EnqueuedTime).IsEqualTo(enqueued);
-        await Assert.That(md.ContentType).IsEqualTo("application/json");
-        await Assert.That(md.Subject).IsEqualTo("full-subject");
-        await Assert.That(md.ApplicationProperties["k"]).IsEqualTo("v");
+        Assert.Equal("full-msg", md.MessageId);
+        Assert.Equal("full-session", md.SessionId);
+        Assert.Equal("full-corr", md.CorrelationId);
+        Assert.Equal(2, md.DeliveryCount);
+        Assert.Equal(42L, md.SequenceNumber);
+        Assert.Equal(enqueued, md.EnqueuedTime);
+        Assert.Equal("application/json", md.ContentType);
+        Assert.Equal("full-subject", md.Subject);
+        Assert.Equal("v", md.ApplicationProperties["k"]);
     }
 
     private static ServiceBusReceivedMessage CreateMessage(

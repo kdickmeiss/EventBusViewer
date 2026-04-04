@@ -2,8 +2,6 @@ trigger:
   branches:
     include:
       - main
-      - 'feature/*'
-      - 'features/*'
 
 pool:
   vmImage: ubuntu-latest
@@ -16,9 +14,6 @@ parameters:
   - name: PublishVstsFeed
     type: string
     default: 'Kevin.CleanArchitecture/Nuget.Feed'
-  - name: NuGetServiceConnection
-    type: string
-    default: 'NuGet.org'
   - name: packableProjects
     type: object
     default:
@@ -36,18 +31,49 @@ stages:
         steps:
           - checkout: self
             fetchDepth: 0
+            persistCredentials: true   # required so the pipeline can push git tags
 
-          - task: gitversion/setup@0
+          - task: gitversion/setup@3
             displayName: 'Install GitVersion'
+            inputs:
+              versionSpec: '6.x'
 
-          - task: gitversion/execute@0
+          - task: gitversion/execute@3
             displayName: 'Determine Version'
             inputs:
               useConfigFile: true
               configFilePath: '.azureDevops/GitVersion.yml'
 
-          - script: echo "##[section]Version $(GitVersion.NuGetVersionV2)"
+          # main    → stable  X.Y.Z        (MajorMinorPatch — no pre-release suffix)
+          # feature → pre-release X.Y.Z-alpha.N (SemVer)
+          - script: |
+              if [ "$(Build.SourceBranch)" = "refs/heads/main" ]; then
+                echo "##vso[task.setvariable variable=PackageVersion]$(GitVersion.MajorMinorPatch)"
+              else
+                echo "##vso[task.setvariable variable=PackageVersion]$(GitVersion.SemVer)"
+              fi
+            displayName: 'Set Package Version'
+
+          - script: echo "##[section]Version $(PackageVersion)"
             displayName: 'Log Version'
+
+          # Detect whether this commit actually introduced a new version.
+          # Commits matching no-bump-message (chore/docs/refactor/etc.) produce no
+          # increment, so MajorMinorPatch would equal the existing tag — in that case
+          # we skip pack, tag and publish to avoid duplicate-version errors.
+          # Must run BEFORE Pack so the IsNewVersion variable is available to its condition.
+          - script: |
+              TAG="$(GitVersion.MajorMinorPatch)"
+              if git rev-parse "$TAG" >/dev/null 2>&1; then
+                echo "Version $TAG already tagged — no new release needed."
+                echo "##vso[task.setvariable variable=IsNewVersion;isOutput=true]false"
+              else
+                echo "New version detected: $TAG"
+                echo "##vso[task.setvariable variable=IsNewVersion;isOutput=true]true"
+              fi
+            name: versionCheck
+            displayName: 'Check Is New Version'
+            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
           - task: DotNetCoreCLI@2
             displayName: 'Restore'
@@ -73,29 +99,56 @@ stages:
             inputs:
               command: 'test'
               projects: 'tests/**/*.csproj'
-              arguments: --configuration $(buildConfiguration) --no-build --results-directory $(Agent.TempDirectory) --coverage --coverage-output-format cobertura --report-trx
+              arguments: --configuration $(buildConfiguration) --no-build --coverage --coverage-output-format cobertura --report-trx
               publishTestResults: true
 
-          - task: PublishCodeCoverageResults@2
-            displayName: 'Publish Code Coverage'
-            inputs:
-              summaryFileLocation: '$(Agent.TempDirectory)/coverage.cobertura.xml'
-
           - ${{ each project in parameters.packableProjects }}:
-            - task: DotNetCoreCLI@2
-              displayName: 'Pack ${{ project.name }}'
-              condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-              inputs:
-                command: 'pack'
-                packagesToPack: '${{ project.path }}'
-                packDirectory: '$(Build.ArtifactStagingDirectory)/packages/nuget'
-                nobuild: true
-                versioningScheme: 'byEnvVar'
-                versionEnvVar: 'GitVersion.NuGetVersionV2'
+              - task: DotNetCoreCLI@2
+                displayName: 'Pack ${{ project.name }}'
+                condition: |
+                  and(
+                    succeeded(),
+                    ne(variables['Build.Reason'], 'PullRequest'),
+                    or(
+                      ne(variables['Build.SourceBranch'], 'refs/heads/main'),
+                      eq(variables['versionCheck.IsNewVersion'], 'true')
+                    )
+                  )
+                inputs:
+                  command: 'pack'
+                  packagesToPack: '${{ project.path }}'
+                  packDirectory: '$(Build.ArtifactStagingDirectory)/packages/nuget'
+                  nobuild: true
+                  versioningScheme: 'byEnvVar'
+                  versionEnvVar: 'PackageVersion'
+
+
+          # Pushes a lightweight git tag (e.g. 1.0.0) on the merge commit so that
+          # GitVersion resolves the correct stable base on every subsequent build.
+          #
+          # ⚠ One-time setup required in Azure DevOps:
+          #   Project Settings → Repositories → Security
+          #   → <YourProject> Build Service → Contribute = Allow
+          - script: |
+              git config user.email "build@pipeline"
+              git config user.name "Azure Pipelines"
+              git tag "$(GitVersion.MajorMinorPatch)"
+              git push origin "$(GitVersion.MajorMinorPatch)"
+              echo "##[section]Tagged release as $(GitVersion.MajorMinorPatch)"
+            displayName: 'Tag Release Commit'
+            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['versionCheck.IsNewVersion'], 'true'))
 
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Artifact'
-            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+            condition: |
+              and(
+                succeeded(),
+                ne(variables['Build.Reason'], 'PullRequest'),
+                or(
+                  ne(variables['Build.SourceBranch'], 'refs/heads/main'),
+                  eq(variables['versionCheck.IsNewVersion'], 'true')
+                )
+              )
             inputs:
               PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/nuget'
               ArtifactName: '$(artifactName)'
@@ -103,7 +156,15 @@ stages:
   - stage: PublishInternal
     displayName: 'Publish — Internal Feed'
     dependsOn: CI
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    condition: |
+      and(
+        succeeded(),
+        ne(variables['Build.Reason'], 'PullRequest'),
+        or(
+          ne(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(dependencies.CI.outputs['build_test_pack.versionCheck.IsNewVersion'], 'true')
+        )
+      )
     jobs:
       - deployment: publish_internal
         displayName: 'Push to Azure Artifacts'

@@ -77,11 +77,10 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
-    protected override async Task AssertDeserializedEventAsync(
+    protected override void AssertDeserializedEvent(
         ParkingReservationCreatedEvent expected,
         ParkingReservationCreatedEvent received)
     {
-        await Task.CompletedTask;
         received.Id.ShouldBe(expected.Id);
         received.OccurredOnUtc.ShouldBe(expected.OccurredOnUtc);
         received.SpotCode.ShouldBe(expected.SpotCode);

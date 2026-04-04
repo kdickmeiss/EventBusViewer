@@ -97,11 +97,10 @@ public sealed partial class TopicConsumerTests
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
-    protected override async Task AssertDeserializedEventAsync(
+    protected override void AssertDeserializedEvent(
         ParkingSpotStatusChangedEvent expected,
         ParkingSpotStatusChangedEvent received)
     {
-        await Task.CompletedTask;
         received.Id.ShouldBe(expected.Id);
         received.OccurredOnUtc.ShouldBe(expected.OccurredOnUtc);
         received.SpotCode.ShouldBe(expected.SpotCode);

@@ -72,7 +72,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
     /// the corresponding property on the originally-published <paramref name="expected"/> event.
     /// Implemented by each concrete class because the properties differ per event type.
     /// </summary>
-    protected abstract Task AssertDeserializedEventAsync(TEvent expected, TEvent received);
+    protected abstract void AssertDeserializedEvent(TEvent expected, TEvent received);
 
     /// <summary>
     /// Removes stale messages from all relevant broker entities before a test.
@@ -161,7 +161,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
         TEvent received = await PublishAndConsumeAsync(@event, TestContext.Current.CancellationToken);
 
-        await AssertDeserializedEventAsync(@event, received);
+        AssertDeserializedEvent(@event, received);
     }
 
     [Fact]

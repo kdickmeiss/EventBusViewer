@@ -1,267 +1,215 @@
+using System.Reflection;
 using Azure.Messaging.ServiceBus;
+using BusWorks.Abstractions.Attributes;
+using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
-using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
 /// <summary>
-/// Abstract base class for consumer integration tests that captures all behaviour shared
-/// between queue and topic scenarios via the Template Method pattern.
+/// Abstract base class for consumer integration tests that drives the real
+/// <c>ServiceBusProcessorBackgroundService</c> pipeline end-to-end.
 /// <para>
 /// Concrete subclasses are responsible for:
 /// <list type="bullet">
-///   <item>Provisioning the broker entities (override <see cref="TestBase.InitializeAsync"/>).</item>
+///   <item>Provisioning any extra broker entities (override <see cref="TestBase.InitializeAsync"/>).</item>
 ///   <item>Supplying a fresh test event (<see cref="NewEvent"/>).</item>
-///   <item>Returning correctly-configured <see cref="ServiceBusReceiver"/> instances.</item>
-///   <item>Providing the concrete consumer type (<see cref="ConsumerType"/>).</item>
-///   <item>Asserting the deserialized event's domain properties (<see cref="AssertDeserializedEvent"/>).</item>
-///   <item>Optionally draining stale messages before a test (<see cref="DrainAsync"/>).</item>
+///   <item>Identifying the consumer type to verify (<see cref="ConsumerType"/>).</item>
+///   <item>Creating a dead-letter receiver for the primary entity (<see cref="CreateDeadLetterReceiver"/>).</item>
+///   <item>Asserting domain-specific event properties (<see cref="AssertDeserializedEvent"/>).</item>
+///   <item>Optionally draining stale state before a test (<see cref="DrainAsync"/>).</item>
 /// </list>
 /// </para>
 /// </summary>
 public abstract class ConsumerTestBase<TEvent> : TestBase
     where TEvent : IIntegrationEvent
 {
+    /// <summary>
+    /// How long to wait for the background service to deliver and process a message.
+    /// </summary>
     protected readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(15);
-    protected static int MaxDeliveryCount => 3;
+
+    /// <summary>
+    /// Must match the <c>MaxDeliveryCount</c> set on the test consumer's
+    /// <c>[ServiceBusQueue]</c> / <c>[ServiceBusTopic]</c> attribute so that the
+    /// <see cref="Consumer_ExceedingMaxDeliveryCount_IsMovedToDeadLetterQueue"/> test
+    /// primes exactly the right number of failures.
+    /// Reads directly from the attribute so it stays in sync automatically.
+    /// </summary>
+    protected int MaxDeliveryCount =>
+        ConsumerType.GetCustomAttribute<ServiceBusQueueAttribute>()?.MaxDeliveryCount
+        ?? ConsumerType.GetCustomAttribute<ServiceBusTopicAttribute>()?.MaxDeliveryCount
+        ?? 5;
 
     protected ConsumerTestBase(EventBusHostFactory factory) : base(factory) { }
+
+    // ── Abstract members ───────────────────────────────────────────────────
 
     /// <summary>Creates a new domain event instance with realistic test data.</summary>
     protected abstract TEvent NewEvent();
 
     /// <summary>
-    /// The concrete consumer type that handles <typeparamref name="TEvent"/>.
-    /// Used by <see cref="PublishAndConsumeAsync"/> to mirror the background service's
-    /// <c>ServiceBusMessageProcessorBuilder.Build(consumerType)</c> dispatch path exactly,
-    /// including DI scope creation and consumer resolution.
+    /// The concrete consumer type registered in DI that handles <typeparamref name="TEvent"/>.
+    /// Used by <see cref="PublishAndConsumeAsync"/> to identify which capture to read from.
     /// </summary>
     protected abstract Type ConsumerType { get; }
 
     /// <summary>
-    /// Publishes <paramref name="event"/> and returns the raw broker message,
-    /// consuming it with <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/>.
-    /// Implementations are responsible for draining stale messages before opening
-    /// the receiver so that the message returned belongs to this specific invocation.
-    /// </summary>
-    protected abstract Task<ServiceBusReceivedMessage> PublishAndReceiveRawAsync(
-        TEvent @event, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Publishes the event and runs the resulting broker message through the real consumer
-    /// deserialization pipeline, returning the fully-typed domain event exactly as a production
-    /// consumer would receive it.
-    /// </summary>
-    /// <remarks>
-    /// Mirrors the <c>ServiceBusProcessorBackgroundService</c> dispatch loop exactly:
-    /// <list type="number">
-    ///   <item>Receives the raw message via <see cref="PublishAndReceiveRawAsync"/>.</item>
-    ///   <item>Opens a fresh DI scope (one per message, same as production).</item>
-    ///   <item>
-    ///     Resolves the consumer from that scope using
-    ///     <c>ServiceBusMessageProcessorBuilder.Build(<see cref="ConsumerType"/>)</c>
-    ///     — the identical reflective factory the background service pre-builds at startup.
-    ///   </item>
-    ///   <item>Awaits the captured event from <see cref="TestConsumerCapture{TEvent}"/>.</item>
-    /// </list>
-    /// </remarks>
-    protected virtual async Task<TEvent> PublishAndConsumeAsync(
-        TEvent @event,
-        CancellationToken cancellationToken = default)
-    {
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, cancellationToken);
-
-        // Mirror the background service: create a DI scope per message, resolve the consumer
-        // from that scope, and dispatch through the same factory the background service uses.
-        using IServiceScope scope = GetRequiredService<IServiceScopeFactory>().CreateScope();
-        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory =
-            ServiceBusMessageProcessorBuilder.Build(ConsumerType);
-        await processorFactory(scope.ServiceProvider)(raw, cancellationToken);
-
-        return await GetRequiredService<TestConsumerCapture<TEvent>>()
-            .ReadAsync(ReceiveTimeout, cancellationToken);
-    }
-
-    /// <summary>
-    /// Creates a <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/> receiver
-    /// targeting the primary test entity (queue or subscription).
-    /// </summary>
-    protected abstract ServiceBusReceiver CreateDeleteReceiver();
-
-    /// <summary>
-    /// Creates a <see cref="ServiceBusReceiveMode.PeekLock"/> receiver
-    /// targeting the primary test entity (queue or subscription).
-    /// </summary>
-    protected abstract ServiceBusReceiver CreatePeekLockReceiver();
-
-    /// <summary>
-    /// Creates a <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/> receiver
-    /// targeting the dead-letter sub-queue of the primary test entity.
+    /// Creates a <see cref="ServiceBusReceiveMode.ReceiveAndDelete"/> receiver targeting the
+    /// dead-letter sub-queue of the primary test entity (queue or subscription).
+    /// Used by <see cref="Consumer_ExceedingMaxDeliveryCount_IsMovedToDeadLetterQueue"/> and
+    /// the DLQ drain inside <see cref="DrainAsync"/>.
     /// </summary>
     protected abstract ServiceBusReceiver CreateDeadLetterReceiver();
 
     /// <summary>
     /// Asserts that each domain-specific property of <paramref name="received"/> matches
-    /// the corresponding property on the originally-published <paramref name="expected"/> event.
-    /// Implemented by each concrete class because the properties differ per event type.
+    /// <paramref name="expected"/>. Implemented per subclass because the properties differ
+    /// per event type.
     /// </summary>
     protected abstract void AssertDeserializedEvent(TEvent expected, TEvent received);
 
+    // ── Virtual members ────────────────────────────────────────────────────
+
     /// <summary>
-    /// Removes stale messages from all relevant broker entities before a test.
-    /// Queue tests leave this as a no-op; topic tests override to drain every subscription.
+    /// Publishes <paramref name="event"/>, waits for the
+    /// <c>ServiceBusProcessorBackgroundService</c> to deserialize and dispatch it via
+    /// the DI-registered consumer, and returns the captured event together with the
+    /// broker metadata the consumer received.
     /// </summary>
-    protected virtual Task DrainAsync() => Task.CompletedTask;
-
-
-    [Fact]
-    public async Task PublishedMessage_IsDelivered()
+    protected virtual async Task<(TEvent Event, MessageContext Metadata)> PublishAndConsumeAsync(
+        TEvent @event,
+        CancellationToken cancellationToken = default)
     {
-        TEvent @event = NewEvent();
-
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
-
-        raw.ShouldNotBeNull();
+        await PublishAsync(@event, cancellationToken);
+        return await GetRequiredService<TestConsumerCapture<TEvent>>()
+            .ReadAsync(ReceiveTimeout, cancellationToken);
     }
+
+    /// <summary>
+    /// Resets the capture channel and dead-letter queue so the next test starts clean.
+    /// Topic subclasses override to additionally drain their fan-out subscriptions.
+    /// </summary>
+    protected virtual async Task DrainAsync()
+    {
+        // Clear the dead-letter sub-queue so the DLQ assertion test starts with a clean slate.
+        await using ServiceBusReceiver dlqReceiver = CreateDeadLetterReceiver();
+        IReadOnlyList<ServiceBusReceivedMessage> batch;
+        do
+        {
+            batch = await dlqReceiver.ReceiveMessagesAsync(
+                maxMessages: 100, maxWaitTime: TimeSpan.FromMilliseconds(300));
+        }
+        while (batch.Count > 0);
+    }
+
+    // ── Shared tests ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task PublishMultipleMessages_AllAreDelivered()
     {
         const int messageCount = 5;
         var published = Enumerable.Range(0, messageCount).Select(_ => NewEvent()).ToList();
+        var expectedIds = published.Select(e => e.Id).ToHashSet();
 
         await DrainAsync();
 
-        await using ServiceBusReceiver receiver = CreateDeleteReceiver();
+        TestConsumerCapture<TEvent> capture = GetRequiredService<TestConsumerCapture<TEvent>>();
 
         foreach (TEvent e in published)
             await PublishAsync(e, TestContext.Current.CancellationToken);
 
-        List<ServiceBusReceivedMessage> received = [];
-        while (received.Count < messageCount)
+        // Read until all expected IDs have been captured; skip any stale messages that
+        // the background service may have processed from a previous (failed) test run.
+        var receivedIds = new HashSet<Guid>();
+        while (receivedIds.Count < messageCount)
         {
-            IReadOnlyList<ServiceBusReceivedMessage> batch =
-                await receiver.ReceiveMessagesAsync(messageCount - received.Count, ReceiveTimeout, TestContext.Current.CancellationToken);
-
-            if (batch.Count == 0)
-                break;
-
-            received.AddRange(batch);
+            (TEvent received, _) = await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+            if (expectedIds.Contains(received.Id))
+                receivedIds.Add(received.Id);
         }
 
-        received.Count.ShouldBe(messageCount);
-
-        var receivedIds = received.Select(m => Guid.Parse(m.MessageId)).ToHashSet();
-
-        foreach (TEvent e in published)
-            receivedIds.ShouldContain(e.Id);
+        receivedIds.SetEquals(expectedIds).ShouldBeTrue();
     }
 
     [Fact]
     public async Task PublishedMessage_ContentType_IsApplicationJson()
     {
-        TEvent @event = NewEvent();
+        (_, MessageContext ctx) = await PublishAndConsumeAsync(
+            NewEvent(), TestContext.Current.CancellationToken);
 
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
-
-        raw.ContentType.ShouldBe("application/json");
+        ctx.ContentType.ShouldBe("application/json");
     }
 
     [Fact]
     public async Task PublishedMessage_MessageId_MatchesEventId()
     {
         TEvent @event = NewEvent();
+        (_, MessageContext ctx) = await PublishAndConsumeAsync(@event, TestContext.Current.CancellationToken);
 
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
-
-        raw.MessageId.ShouldBe(@event.Id.ToString());
+        ctx.MessageId.ShouldBe(@event.Id.ToString());
     }
 
     [Fact]
     public async Task PublishedMessage_CorrelationId_MatchesEventId()
     {
         TEvent @event = NewEvent();
+        (_, MessageContext ctx) = await PublishAndConsumeAsync(@event, TestContext.Current.CancellationToken);
 
-        ServiceBusReceivedMessage raw = await PublishAndReceiveRawAsync(@event, TestContext.Current.CancellationToken);
-
-        raw.CorrelationId.ShouldBe(@event.Id.ToString());
+        ctx.CorrelationId.ShouldBe(@event.Id.ToString());
     }
 
     [Fact]
     public async Task Consumer_Deserializes_AllEventProperties_Correctly()
     {
         TEvent @event = NewEvent();
-
-        TEvent received = await PublishAndConsumeAsync(@event, TestContext.Current.CancellationToken);
+        (TEvent received, _) = await PublishAndConsumeAsync(@event, TestContext.Current.CancellationToken);
 
         AssertDeserializedEvent(@event, received);
     }
 
     [Fact]
-    public async Task AbandonedMessage_IsRequeued_WithIncrementedDeliveryCount()
+    public async Task Consumer_AbandonedMessage_IsRetried_WithIncrementedDeliveryCount()
     {
         await DrainAsync();
 
-        await using ServiceBusReceiver receiver = CreatePeekLockReceiver();
+        TEvent @event = NewEvent();
+        TestConsumerCapture<TEvent> capture = GetRequiredService<TestConsumerCapture<TEvent>>();
 
-        await PublishAsync(NewEvent(), TestContext.Current.CancellationToken);
+        // Prime the consumer to throw once — the background service will call AbandonMessageAsync,
+        // the broker will requeue the message, and the second delivery should succeed.
+        capture.FailNextN(1);
+        await PublishAsync(@event, TestContext.Current.CancellationToken);
 
-        ServiceBusReceivedMessage? firstDelivery = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
-        firstDelivery.ShouldNotBeNull();
+        (TEvent received, MessageContext ctx) =
+            await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
-        // Simulate a transient failure — abandoning returns the message to the active entity.
-        await receiver.AbandonMessageAsync(firstDelivery, cancellationToken: TestContext.Current.CancellationToken);
-
-        ServiceBusReceivedMessage? retryDelivery = await receiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
-
-        retryDelivery.ShouldNotBeNull();
-        retryDelivery.DeliveryCount.ShouldBe(2);
-        retryDelivery.MessageId.ShouldBe(firstDelivery.MessageId);
-
-        // Cleanup — complete the retry delivery to leave the entity clean.
-        await receiver.CompleteMessageAsync(retryDelivery, TestContext.Current.CancellationToken);
+        received.Id.ShouldBe(@event.Id);
+        ctx.DeliveryCount.ShouldBe(2);
     }
 
     [Fact]
-    public async Task Message_ExceedingMaxDeliveryCount_IsMovedToDeadLetterQueue()
+    public async Task Consumer_ExceedingMaxDeliveryCount_IsMovedToDeadLetterQueue()
     {
-        TEvent @event = NewEvent();
-
         await DrainAsync();
 
-        await using ServiceBusReceiver activeReceiver = CreatePeekLockReceiver();
+        TEvent @event = NewEvent();
+        TestConsumerCapture<TEvent> capture = GetRequiredService<TestConsumerCapture<TEvent>>();
 
+        // Fail on every delivery up to the application-level limit. The background service
+        // calls DeadLetterMessageAsync on the final attempt (DeliveryCount == MaxDeliveryCount).
+        capture.FailNextN(MaxDeliveryCount);
         await PublishAsync(@event, TestContext.Current.CancellationToken);
 
-        // Exhaust the delivery budget; the final abandon triggers the broker to DLQ the message.
-        for (int delivery = 1; delivery <= MaxDeliveryCount; delivery++)
-        {
-            ServiceBusReceivedMessage? message = await activeReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
-
-            message.ShouldNotBeNull();
-            message.DeliveryCount.ShouldBe(delivery);
-
-            await activeReceiver.AbandonMessageAsync(message, cancellationToken: TestContext.Current.CancellationToken);
-        }
-
-        // Active entity should now be empty.
-        ServiceBusReceivedMessage? shouldBeNull =
-            await activeReceiver.ReceiveMessageAsync(maxWaitTime: TimeSpan.FromSeconds(3), cancellationToken: TestContext.Current.CancellationToken);
-
-        shouldBeNull.ShouldBeNull();
-
-        // The message should be present in the dead-letter sub-queue.
-        // The DLQ sub-queue is provisioned automatically by the broker alongside the parent entity.
+        // All retries may take several seconds — use a generous timeout.
         await using ServiceBusReceiver dlqReceiver = CreateDeadLetterReceiver();
-
-        ServiceBusReceivedMessage? deadLettered = await dlqReceiver.ReceiveMessageAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+        ServiceBusReceivedMessage? deadLettered = await dlqReceiver.ReceiveMessageAsync(
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         deadLettered.ShouldNotBeNull();
         deadLettered.MessageId.ShouldBe(@event.Id.ToString());
-        deadLettered.DeliveryCount.ShouldBe(MaxDeliveryCount + 1);
     }
 }

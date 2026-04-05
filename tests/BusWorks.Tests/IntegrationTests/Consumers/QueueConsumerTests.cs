@@ -1,7 +1,5 @@
 ﻿using Azure.Messaging.ServiceBus;
-using BusWorks.BackgroundServices;
 using BusWorks.Tests.IntegrationTests.BuildingBlocks;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -12,55 +10,19 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
 {
     private const string QueueName = "parking-reservation-created";
 
-    public override async ValueTask InitializeAsync()
-    {
-        await EnsureQueueExistsAsync(QueueName, o => o.MaxDeliveryCount = MaxDeliveryCount);
-    }
 
     protected override ParkingReservationCreatedEvent NewEvent() =>
         new(Guid.NewGuid(), DateTime.UtcNow, "A-12", "usr_7f8b91c2", 3.50m);
 
-    /// <inheritdoc />
     protected override Type ConsumerType => typeof(CapturingParkingReservationConsumer);
-
-    /// <inheritdoc />
-    /// <remarks>
-    /// The receiver is created <b>before</b> the publish call to ensure no delivery
-    /// window can be missed if the broker delivers extremely fast.
-    /// </remarks>
-    protected override async Task<ServiceBusReceivedMessage> PublishAndReceiveRawAsync(
-        ParkingReservationCreatedEvent @event,
-        CancellationToken cancellationToken = default)
-    {
-        await using ServiceBusReceiver receiver = CreateDeleteReceiver();
-
-        await PublishAsync(@event, cancellationToken);
-
-        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(
-            ReceiveTimeout, cancellationToken);
-
-        return raw ?? throw new InvalidOperationException(
-            $"No message arrived on queue '{QueueName}' within {ReceiveTimeout.TotalSeconds} s.");
-    }
-
-
-    protected override ServiceBusReceiver CreateDeleteReceiver() =>
-        Emulator.Client.CreateReceiver(
-            QueueName,
-            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
-
-    protected override ServiceBusReceiver CreatePeekLockReceiver() =>
-        Emulator.Client.CreateReceiver(
-            QueueName,
-            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.PeekLock });
 
     protected override ServiceBusReceiver CreateDeadLetterReceiver() =>
         Emulator.Client.CreateReceiver(
             QueueName,
             new ServiceBusReceiverOptions
             {
-                SubQueue = SubQueue.DeadLetter,
-                ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+                SubQueue     = SubQueue.DeadLetter,
+                ReceiveMode  = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
     protected override void AssertDeserializedEvent(
@@ -74,6 +36,13 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
         received.HourlyRate.ShouldBe(expected.HourlyRate);
     }
 
+    /// <summary>
+    /// Verifies that the consumer correctly deserializes a message whose JSON property
+    /// names do not match the expected casing. Sends a raw JSON body directly to the queue
+    /// so the background service — not a hand-rolled test helper — exercises the full
+    /// deserialization and <see cref="BusWorks.Abstractions.Consumer.IConsumeContext{T}"/>
+    /// mapping pipeline.
+    /// </summary>
     [Fact]
     public async Task Consumer_Deserializes_RawMessage_WithMixedCasePropertyNames()
     {
@@ -95,26 +64,12 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
         await sender.SendMessageAsync(new ServiceBusMessage(body)
         {
             ContentType = "application/json",
-            MessageId = expectedId.ToString()
+            MessageId   = expectedId.ToString()
         }, TestContext.Current.CancellationToken);
 
-        await using ServiceBusReceiver receiver = Emulator.Client.CreateReceiver(
-            QueueName,
-            new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
-
-        ServiceBusReceivedMessage? raw = await receiver.ReceiveMessageAsync(
-            ReceiveTimeout, TestContext.Current.CancellationToken);
-
-        raw.ShouldNotBeNull();
-
-        // Act — mirror the background service: create a DI scope, resolve the consumer from it,
-        // and dispatch through the same Build() factory the background service pre-builds at startup.
-        using IServiceScope scope = GetRequiredService<IServiceScopeFactory>().CreateScope();
-        Func<IServiceProvider, Func<ServiceBusReceivedMessage, CancellationToken, Task>> processorFactory =
-            ServiceBusMessageProcessorBuilder.Build(typeof(CapturingParkingReservationConsumer));
-        await processorFactory(scope.ServiceProvider)(raw, TestContext.Current.CancellationToken);
-
-        ParkingReservationCreatedEvent received =
+        // Act — the background service picks up the message, deserializes it via the real
+        // consumer pipeline, and writes it to the capture channel.
+        (ParkingReservationCreatedEvent received, _) =
             await GetRequiredService<TestConsumerCapture<ParkingReservationCreatedEvent>>()
                 .ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 

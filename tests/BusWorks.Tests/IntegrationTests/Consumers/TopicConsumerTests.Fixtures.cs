@@ -41,7 +41,6 @@ public sealed partial class TopicConsumerTests
         : IConsumer<ParkingSpotStatusChangedEvent>
     {
         public Task Consume(IConsumeContext<ParkingSpotStatusChangedEvent> context)
-            => capture.WriteAsync(context.Message).AsTask();
+            => capture.WriteAsync(context.Message, context.Metadata, context.CancellationToken).AsTask();
     }
 }
-

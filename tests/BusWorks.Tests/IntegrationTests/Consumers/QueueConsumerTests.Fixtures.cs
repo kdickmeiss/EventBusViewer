@@ -37,7 +37,6 @@ public sealed partial class QueueConsumerTests
         : IConsumer<ParkingReservationCreatedEvent>
     {
         public Task Consume(IConsumeContext<ParkingReservationCreatedEvent> context)
-            => capture.WriteAsync(context.Message).AsTask();
+            => capture.WriteAsync(context.Message, context.Metadata, context.CancellationToken).AsTask();
     }
 }
-

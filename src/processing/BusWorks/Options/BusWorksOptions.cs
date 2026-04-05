@@ -20,22 +20,22 @@ public sealed class BusWorksOptions
     public const string SectionName = "BusWorksOptions";
 
     /// <summary>Selects the Azure Service Bus authentication strategy.</summary>
-    public EventBusAuthenticationType AuthenticationType { get; init; }
+    public EventBusAuthenticationType AuthenticationType { get; set; }
 
-    public ConnectionStringOptions? ConnectionString { get; init; }
-    public ManagedIdentityOptions? ManagedIdentity { get; init; }
-    public ApplicationRegistrationOptions? ApplicationRegistration { get; init; }
+    public ConnectionStringOptions? ConnectionString { get; set; }
+    public ManagedIdentityOptions? ManagedIdentity { get; set; }
+    public ApplicationRegistrationOptions? ApplicationRegistration { get; set; }
     
-    public AzureCliOptions? AzureCli { get; init; }
+    public AzureCliOptions? AzureCli { get; set; }
 
     /// <summary>Max concurrent message-processing calls for non-session processors. Default: 10.</summary>
-    public int MaxConcurrentCalls { get; init; } = 10;
+    public int MaxConcurrentCalls { get; set; } = 10;
 
     /// <summary>Max concurrent sessions for session-aware processors. Default: 8.</summary>
-    public int MaxConcurrentSessions { get; init; } = 8;
+    public int MaxConcurrentSessions { get; set; } = 8;
 
     /// <summary>Max concurrent calls per session for session-aware processors. Default: 1.</summary>
-    public int MaxConcurrentCallsPerSession { get; init; } = 1;
+    public int MaxConcurrentCallsPerSession { get; set; } = 1;
 }
 
 public sealed class ConnectionStringOptions

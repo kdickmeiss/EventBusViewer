@@ -7,6 +7,7 @@ using Xunit;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
+[Trait("Category", "Unit")]
 public sealed class ServiceBusTelemetryTests
 {
     private static readonly Tracer NoOpTracer =

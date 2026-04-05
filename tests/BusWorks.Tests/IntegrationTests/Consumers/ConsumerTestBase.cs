@@ -224,11 +224,33 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
         capture.FailNextN(1);
         await PublishAsync(@event, TestContext.Current.CancellationToken);
 
-        (TEvent received, MessageContext ctx) =
-            await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+        // Use the same ID-matching skip loop as PublishAndConsumeAsync so that any stale
+        // message from a prior test that arrives after the drain cannot fail this assertion.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        deadline.CancelAfter(ReceiveTimeout);
 
-        received.Id.ShouldBe(@event.Id);
-        ctx.DeliveryCount.ShouldBe(2);
+        try
+        {
+            while (true)
+            {
+                (TEvent received, MessageContext ctx) =
+                    await capture.ReadAsync(ReceiveTimeout, deadline.Token);
+
+                if (received.Id != @event.Id)
+                    continue; // stale delivery from a prior test — skip it
+
+                ctx.DeliveryCount.ShouldBe(2);
+                return;
+            }
+        }
+        catch (OperationCanceledException)
+            when (deadline.IsCancellationRequested && !TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Event '{typeof(TEvent).Name}' with Id '{@event.Id}' was not retried within " +
+                $"{ReceiveTimeout.TotalSeconds} s with DeliveryCount == 2.");
+        }
     }
 
     [Fact]

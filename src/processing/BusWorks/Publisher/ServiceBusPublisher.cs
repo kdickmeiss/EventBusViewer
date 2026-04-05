@@ -81,7 +81,7 @@ internal sealed class ServiceBusPublisher(
     /// <summary>
     /// Resolves the Service Bus queue or topic name from the route attribute on <typeparamref name="TEvent"/>.
     /// </summary>
-    private static string ResolveDestination<TEvent>() where TEvent : IIntegrationEvent
+    internal static string ResolveDestination<TEvent>() where TEvent : IIntegrationEvent
     {
         Type eventType = typeof(TEvent);
 

@@ -1,8 +1,10 @@
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Consumers;
 
+[Trait("Category", "Unit")]
 public sealed partial class ServiceBusConsumerTests
 {
     private sealed record TestEvent(Guid Id, DateTime OccurredOnUtc, string? Name, int Value)

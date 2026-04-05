@@ -11,6 +11,7 @@ namespace BusWorks.Tests.UnitTests;
 /// Verifies consumer-type discovery, deduplication of duplicate assemblies, and
 /// exclusion of abstract types and non-consumer classes — without requiring a live broker.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class ServiceBusAssemblyRegistryTests
 {
     // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -131,13 +132,18 @@ public sealed class ServiceBusAssemblyRegistryTests
     [Fact]
     public void WithMultipleDistinctAssemblies_GetConsumerTypes_AggregatesFromAll()
     {
-        // BusWorks.Tests.dll + BusWorks.Tests.dll (same here but logically two assemblies)
-        // In practice this proves the SelectMany aggregation path is exercised.
+        // Arrange — two genuinely distinct assemblies.
+        // The test assembly contains concrete consumers; the processing assembly contains none.
         Assembly testAssembly = typeof(ServiceBusAssemblyRegistryTests).Assembly;
-        var registry = new ServiceBusAssemblyRegistry(testAssembly);
+        Assembly processingAssembly = typeof(ServiceBusAssemblyRegistry).Assembly;
 
-        // All consumer types from the test assembly should be present.
-        registry.GetConsumerTypes().ShouldContain(typeof(ConcreteConsumerForRegistry));
+        var singleRegistry = new ServiceBusAssemblyRegistry(testAssembly);
+        var multiRegistry  = new ServiceBusAssemblyRegistry(testAssembly, processingAssembly);
+
+        // Assert — every consumer from the single-assembly scan must be present in the
+        // multi-assembly scan, proving the SelectMany aggregation path runs correctly.
+        foreach (Type consumerType in singleRegistry.GetConsumerTypes())
+            multiRegistry.GetConsumerTypes().ShouldContain(consumerType);
     }
 }
 

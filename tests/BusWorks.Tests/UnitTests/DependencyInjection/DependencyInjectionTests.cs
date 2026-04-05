@@ -22,6 +22,7 @@ namespace BusWorks.Tests.UnitTests.DependencyInjection;
 /// a no-op tracer to satisfy that dependency.
 /// </para>
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class DependencyInjectionTests
 {
     // A syntactically valid connection string that satisfies ServiceBusClient's constructor

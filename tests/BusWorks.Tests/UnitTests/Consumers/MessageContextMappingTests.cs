@@ -12,6 +12,7 @@ namespace BusWorks.Tests.UnitTests.Consumers;
 /// correctly maps every property from <see cref="ServiceBusReceivedMessage"/>
 /// to <see cref="MessageContext"/> before calling <see cref="IConsumer{T}.Consume"/>.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class MessageContextMappingTests
 {
     // A minimal event type — the content does not matter for metadata mapping tests.

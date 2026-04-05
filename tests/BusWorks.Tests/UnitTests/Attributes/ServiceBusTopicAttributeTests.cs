@@ -4,6 +4,7 @@ using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Attributes;
 
+[Trait("Category", "Unit")]
 public sealed class ServiceBusTopicAttributeTests
 {
     [ServiceBusTopic("theme-park-service")]

@@ -1,9 +1,11 @@
 using BusWorks.Abstractions.Attributes;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
+[Trait("Category", "Unit")]
 public sealed partial class ServiceBusProcessorBackgroundServiceTests
 {
     // ── Message types ─────────────────────────────────────────────────────────

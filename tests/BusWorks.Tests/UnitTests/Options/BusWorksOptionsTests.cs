@@ -4,7 +4,8 @@ using Xunit;
 
 namespace BusWorks.Tests.UnitTests.Options;
 
-public class BusWorksOptionsTests
+[Trait("Category", "Unit")]
+public sealed class BusWorksOptionsTests
 {
     [Fact]
     public void EventBusOptions_Defaults_AreCorrect()
@@ -19,6 +20,7 @@ public class BusWorksOptionsTests
         options.MaxConcurrentCalls.ShouldBe(10);
         options.MaxConcurrentSessions.ShouldBe(8);
         options.MaxConcurrentCallsPerSession.ShouldBe(1);
+        options.SessionIdleTimeout.ShouldBeNull();
     }
 
     [Theory]

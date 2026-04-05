@@ -7,6 +7,7 @@ using Xunit;
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
 [Collection(nameof(IntegrationTestCollection))]
+[Trait("Category", "Integration")]
 public abstract class TestBase(EventBusHostFactory factory) : IAsyncLifetime
 {
     /// <summary>

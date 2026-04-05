@@ -36,6 +36,38 @@ public sealed class BusWorksOptions
 
     /// <summary>Max concurrent calls per session for session-aware processors. Default: 1.</summary>
     public int MaxConcurrentCallsPerSession { get; set; } = 1;
+
+    /// <summary>
+    /// How long a session-aware processor waits for a new message on an idle session before
+    /// releasing that session slot and accepting the next queued session.
+    /// Only applies to consumers decorated with <c>[ServiceBusQueue(RequireSession = true)]</c>
+    /// or <c>[ServiceBusTopic(RequireSession = true)]</c>; ignored entirely for non-session processors.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Why this matters:</strong> The processor holds up to <see cref="MaxConcurrentSessions"/>
+    /// session slots simultaneously. After the last message in a session is consumed the processor
+    /// keeps the slot open, waiting for more messages from that same session. Without a timeout the
+    /// slot stays locked for the full <c>MaxAutoLockRenewalDuration</c> (5 minutes by default).
+    /// Once all slots are occupied by idle sessions, new sessions cannot be picked up until a slot
+    /// is released — causing processing to stall.
+    /// </para>
+    /// <para>
+    /// <strong>Recommended values by environment:</strong>
+    /// <list type="table">
+    ///   <listheader><term>Environment</term><description>Value</description></listheader>
+    ///   <item><term>Tests</term><description><c>500 ms – 1 s</c> — release slots immediately after each message; no session affinity needed.</description></item>
+    ///   <item><term>Development</term><description><c>5 s – 15 s</c> — fast feedback; sessions clear quickly between runs.</description></item>
+    ///   <item><term>Production</term><description><c>30 s – 60 s</c> — preserve session affinity for bursty senders while still freeing idle slots within a reasonable time.</description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// When <c>null</c> (the default) the Azure SDK applies its own internal default, which
+    /// effectively behaves like <c>MaxAutoLockRenewalDuration</c>. Always set an explicit value
+    /// in environments where sessions are short-lived or tests run in rapid succession.
+    /// </para>
+    /// </remarks>
+    public TimeSpan? SessionIdleTimeout { get; set; }
 }
 
 public sealed class ConnectionStringOptions

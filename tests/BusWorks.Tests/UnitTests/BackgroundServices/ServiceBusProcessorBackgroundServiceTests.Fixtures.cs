@@ -1,4 +1,3 @@
-using BusWorks.Abstractions;
 using BusWorks.Abstractions.Attributes;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
@@ -106,6 +105,18 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
+
+    // ── Consumers that do NOT implement IConsumer<T> ─────────────────────────
+
+    // [ServiceBusQueue] without explicit name AND without IConsumer<T>:
+    // ResolveQueueNameFromMessageType receives a null messageType → must throw.
+    [ServiceBusQueue]
+    private sealed class QueueConsumerWithoutIConsumer { }
+
+    // [ServiceBusTopic] without IConsumer<T>:
+    // ResolveTopicNameFromMessageType receives a null messageType → must throw.
+    [ServiceBusTopic("resort-subscription")]
+    private sealed class TopicConsumerWithoutIConsumer { }
 
     // ── GetConsumerMessageType — multi-level inheritance ──────────────────────
 

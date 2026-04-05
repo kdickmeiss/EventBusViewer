@@ -127,7 +127,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
             MaxConcurrentSessions = _worksOptions.MaxConcurrentSessions,
             MaxConcurrentCallsPerSession = _worksOptions.MaxConcurrentCallsPerSession,
             AutoCompleteMessages = false,
-            MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)
+            MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5),
+            SessionIdleTimeout = _worksOptions.SessionIdleTimeout
         };
 
         return endpoint.IsQueue

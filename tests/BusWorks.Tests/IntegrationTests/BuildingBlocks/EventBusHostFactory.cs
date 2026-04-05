@@ -50,6 +50,8 @@ public sealed class EventBusHostFactory : IAsyncLifetime
                     [$"{BusWorksOptions.SectionName}:MaxConcurrentCalls"] = "10",
                     [$"{BusWorksOptions.SectionName}:MaxConcurrentSessions"] = "8",
                     [$"{BusWorksOptions.SectionName}:MaxConcurrentCallsPerSession"] = "1",
+                    // Release idle sessions promptly so session-slot exhaustion cannot block tests.
+                    [$"{BusWorksOptions.SectionName}:SessionIdleTimeout"] = "00:00:00.500",
                 }))
             .ConfigureServices((context, services) =>
             {
@@ -150,7 +152,7 @@ public sealed class EventBusHostFactory : IAsyncLifetime
 
             if (endpoint.IsQueue)
             {
-                await EnsureQueueAsync(endpoint.QueueOrTopicName);
+                await EnsureQueueAsync(endpoint.QueueOrTopicName, endpoint.RequireSession);
             }
             else
             {
@@ -160,10 +162,20 @@ public sealed class EventBusHostFactory : IAsyncLifetime
         }
     }
 
-    private async Task EnsureQueueAsync(string name)
+    private async Task EnsureQueueAsync(string name, bool requireSession = false)
     {
         if (await Emulator.AdminClient.QueueExistsAsync(name))
-            return;
+        {
+            // A queue created by a previous test run may have the wrong RequiresSession setting
+            // (e.g. created without session support before the session consumer was added).
+            // Azure Service Bus does not allow changing RequiresSession after creation, so we
+            // must delete and recreate the queue when the setting does not match.
+            QueueProperties existing = await Emulator.AdminClient.GetQueueAsync(name);
+            if (existing.RequiresSession == requireSession)
+                return; // Already configured correctly — nothing to do.
+
+            await Emulator.AdminClient.DeleteQueueAsync(name);
+        }
 
         try
         {
@@ -172,7 +184,8 @@ public sealed class EventBusHostFactory : IAsyncLifetime
                 // Set high so the broker never interferes before application-level enforcement.
                 MaxDeliveryCount = 10,
                 LockDuration = TimeSpan.FromSeconds(30),
-                DefaultMessageTimeToLive = TimeSpan.FromMinutes(5)
+                DefaultMessageTimeToLive = TimeSpan.FromMinutes(5),
+                RequiresSession = requireSession
             });
         }
         catch (ServiceBusException ex)

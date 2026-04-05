@@ -1,3 +1,4 @@
+using System.Reflection;
 using Azure.Messaging.ServiceBus;
 using BusWorks.Abstractions;
 using BusWorks.Options;
@@ -312,6 +313,35 @@ public sealed class DependencyInjectionTests
         ServiceBusClient second = provider.GetRequiredService<ServiceBusClient>();
 
         second.ShouldBeSameAs(first);
+    }
+
+    // ── Consumer registration ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Every consumer type discovered from the supplied assemblies must be registered
+    /// with <see cref="ServiceLifetime.Scoped"/> so that
+    /// <c>ServiceBusMessageProcessorBuilder.Build()</c> can resolve them from a DI scope.
+    /// </summary>
+    [Fact]
+    public void AddBusWorks_WithConsumerAssemblies_RegistersEachConsumerTypeAsScoped()
+    {
+        ServiceCollection services = new();
+        Assembly testAssembly = typeof(DependencyInjectionTests).Assembly;
+        services.AddBusWorks(ValidConnectionStringOptions(), testAssembly);
+
+        // Derive the same consumer list that AddBusWorks scanned internally.
+        var registry = new ServiceBusAssemblyRegistry(testAssembly);
+        IReadOnlyList<Type> consumerTypes = registry.GetConsumerTypes();
+
+        // The test assembly contains several consumer fixtures — at least one must be present.
+        consumerTypes.ShouldNotBeEmpty("the test assembly must contain at least one IConsumer<T>");
+
+        foreach (Type consumerType in consumerTypes)
+        {
+            ServiceDescriptor? descriptor = services.FirstOrDefault(sd => sd.ServiceType == consumerType);
+            descriptor.ShouldNotBeNull($"Consumer '{consumerType.Name}' should be registered in the service collection.");
+            descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped, $"Consumer '{consumerType.Name}' must be registered as Scoped.");
+        }
     }
 }
 

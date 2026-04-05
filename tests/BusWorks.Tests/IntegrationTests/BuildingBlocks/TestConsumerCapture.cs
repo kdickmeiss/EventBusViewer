@@ -31,6 +31,20 @@ internal sealed class TestConsumerCapture<TEvent>
     /// </summary>
     public void FailNextN(int n) => Interlocked.Exchange(ref _failsRemaining, n);
 
+    /// <summary>
+    /// Resets the fail counter to zero and discards every pending entry in the channel.
+    /// Call this before each test to guarantee a clean capture state regardless of what
+    /// previous tests left behind.
+    /// </summary>
+    public void Drain()
+    {
+        Interlocked.Exchange(ref _failsRemaining, 0);
+        while (_channel.Reader.TryRead(out _))
+        {
+            // discard stale entry
+        }
+    }
+
     // ── Write ──────────────────────────────────────────────────────────────
 
     /// <summary>

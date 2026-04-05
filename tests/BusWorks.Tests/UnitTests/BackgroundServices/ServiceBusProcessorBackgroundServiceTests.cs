@@ -167,6 +167,44 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
         messageType.ShouldBe(typeof(QueueMessage));
     }
 
+    // ── GetEndpointDescription ────────────────────────────────────────────────
+
+    [Fact]
+    public void GetEndpointDescription_QueueEndpoint_ReturnsQueueFormat()
+    {
+        ServiceBusEndpoint endpoint = new("my-queue");
+
+        string description = ServiceBusEndpointResolver.GetEndpointDescription(endpoint);
+
+        description.ShouldBe("Queue: my-queue");
+    }
+
+    [Fact]
+    public void GetEndpointDescription_TopicEndpoint_ReturnsTopicAndSubscriptionFormat()
+    {
+        ServiceBusEndpoint endpoint = new("my-topic", SubscriptionName: "my-sub");
+
+        string description = ServiceBusEndpointResolver.GetEndpointDescription(endpoint);
+
+        description.ShouldBe("Topic: my-topic, Subscription: my-sub");
+    }
+
+    // ── ResolveEndpoint — null messageType (consumer does not implement IConsumer<T>) ─
+
+    [Fact]
+    public void ResolveEndpoint_QueueConsumer_WithoutIConsumerImplementation_ThrowsWithConsumerName()
+    {
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(QueueConsumerWithoutIConsumer)))
+            .Message.ShouldContain(nameof(QueueConsumerWithoutIConsumer));
+    }
+
+    [Fact]
+    public void ResolveEndpoint_TopicConsumer_WithoutIConsumerImplementation_ThrowsWithConsumerName()
+    {
+        Should.Throw<InvalidOperationException>(() => InvokeResolveEndpoint(typeof(TopicConsumerWithoutIConsumer)))
+            .Message.ShouldContain(nameof(TopicConsumerWithoutIConsumer));
+    }
+
     // These thin wrappers call the public static methods on the extracted helper
     // classes directly — no reflection needed after the refactoring.
     private static ServiceBusEndpoint InvokeResolveEndpoint(Type consumerType)

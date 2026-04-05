@@ -46,6 +46,16 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
 
     protected ConsumerTestBase(EventBusHostFactory factory) : base(factory) { }
 
+    /// <summary>
+    /// Clears any stale capture-channel entries and resets the <see cref="TestConsumerCapture{TEvent}"/>
+    /// fail counter so every test starts with a pristine capture state.
+    /// </summary>
+    public override ValueTask InitializeAsync()
+    {
+        GetRequiredService<TestConsumerCapture<TEvent>>().Drain();
+        return base.InitializeAsync();
+    }
+
     // ── Abstract members ───────────────────────────────────────────────────
 
     /// <summary>Creates a new domain event instance with realistic test data.</summary>
@@ -79,14 +89,44 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
     /// <c>ServiceBusProcessorBackgroundService</c> to deserialize and dispatch it via
     /// the DI-registered consumer, and returns the captured event together with the
     /// broker metadata the consumer received.
+    /// <para>
+    /// Any messages captured before <paramref name="event"/> is seen (stale deliveries
+    /// from a preceding test that arrived after the per-test <see cref="InitializeAsync"/>
+    /// drain) are silently discarded. The overall wait is bounded by <see cref="ReceiveTimeout"/>.
+    /// </para>
     /// </summary>
     protected virtual async Task<(TEvent Event, MessageContext Metadata)> PublishAndConsumeAsync(
         TEvent @event,
         CancellationToken cancellationToken = default)
     {
         await PublishAsync(@event, cancellationToken);
-        return await GetRequiredService<TestConsumerCapture<TEvent>>()
-            .ReadAsync(ReceiveTimeout, cancellationToken);
+
+        TestConsumerCapture<TEvent> capture = GetRequiredService<TestConsumerCapture<TEvent>>();
+
+        // A single deadline CTS bounds the total wait across all channel reads; stale
+        // messages with a different Id are skipped rather than accepted as the result.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(ReceiveTimeout);
+
+        try
+        {
+            while (true)
+            {
+                (TEvent received, MessageContext ctx) =
+                    await capture.ReadAsync(ReceiveTimeout, deadline.Token);
+
+                if (received.Id == @event.Id)
+                    return (received, ctx);
+            }
+        }
+        catch (OperationCanceledException)
+            when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Event '{typeof(TEvent).Name}' with Id '{@event.Id}' was not captured within " +
+                $"{ReceiveTimeout.TotalSeconds} s. " +
+                "Verify the consumer is registered in DI and the background service is running.");
+        }
     }
 
     /// <summary>

@@ -1,5 +1,4 @@
-﻿using Azure.Messaging.ServiceBus;
-using BusWorks;
+﻿using BusWorks;
 using BusWorks.Examples.Sender.Menus;
 using BusWorks.Examples.Sender.Menus.Messaging;
 using BusWorks.Examples.Sender.Services;
@@ -11,10 +10,6 @@ using OpenTelemetry.Trace;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
-// builder.Services.AddOpenTelemetry()
-//     .WithTracing(t => t
-//         .AddSource(builder.Environment.ApplicationName)
-//         .AddConsoleExporter());
 builder.AddServiceDefaults();
 
 builder.Services.AddSingleton(TracerProvider.Default.GetTracer(builder.Environment.ApplicationName));

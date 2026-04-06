@@ -17,9 +17,11 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMudServices();
 
-// Settings are managed by SettingsService; Service Bus clients are created lazily inside QueueService.
+// Settings + shared Service Bus client provider; domain services use the provider directly.
 builder.Services.AddSingleton<SettingsService>();
+builder.Services.AddSingleton<ServiceBusClientProvider>();
 builder.Services.AddSingleton<QueueService>();
+builder.Services.AddSingleton<TopicService>();
 
 WebApplication app = builder.Build();
 

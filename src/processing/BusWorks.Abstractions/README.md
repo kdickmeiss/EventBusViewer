@@ -1,10 +1,25 @@
 ﻿# BusWorks.Abstractions
 
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
+![NuGet](https://img.shields.io/nuget/v/BusWorks.Abstractions?logo=nuget)
+![Zero dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
+
 Framework contracts for [BusWorks](https://www.nuget.org/packages/BusWorks) — the Azure Service Bus message processor.
 
 This package has **zero NuGet dependencies** by design. Reference it from your Application and Domain layers to define integration events and consumers without taking any Azure SDK dependency.
 
-## 📦 What's Included
+---
+
+## Table of contents
+
+- [What's included](#-whats-included)
+- [Quick start](#-quick-start)
+- [Recommended project layout](#-recommended-project-layout)
+- [Related packages](#-related-packages)
+
+---
+
+## 📦 What's included
 
 | Type | Description |
 |---|---|
@@ -21,7 +36,7 @@ This package has **zero NuGet dependencies** by design. Reference it from your A
 | `[ServiceBusQueue]` | Decorate a consumer class to bind it to a queue |
 | `[ServiceBusTopic]` | Decorate a consumer class to bind it to a topic subscription |
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### 1. Define an Integration Event
 
@@ -68,7 +83,7 @@ public class RegisterUserCommandHandler(IEventBusPublisher eventBus)
 }
 ```
 
-## 🏗️ Recommended Project Layout
+## 🏗️ Recommended project layout
 
 ```
 MyService.IntegrationEvents/     ← references BusWorks.Abstractions only
@@ -84,7 +99,7 @@ MyService.Infrastructure/        ← references BusWorks (full package)
 
 The Application and Domain layers never depend on the Azure SDK — only on this package.
 
-## 🔗 Related Packages
+## 🔗 Related packages
 
-- **[BusWorks](https://www.nuget.org/packages/BusWorks)** — Infrastructure implementation (Azure Service Bus, DI wiring, background processor)
-
+- **[BusWorks](https://www.nuget.org/packages/BusWorks)** — Infrastructure implementation (Azure Service Bus, DI wiring, background processor, OpenTelemetry tracing)
+- **[BusWorks.Viewer](../../viewers/BusWorks.Viewer/README.md)** — Browser-based management UI for queues, topics, and subscriptions

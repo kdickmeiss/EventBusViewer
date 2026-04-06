@@ -1,0 +1,223 @@
+@using System.Text.Json
+@using BusWorks.Viewer.Models
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Send" Color="Color.Primary"/>
+            <MudText Typo="Typo.h6">Send Message</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@TopicName</MudChip>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loadingSubscriptions)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+        }
+
+        <MudStack Spacing="4">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                The message is published to the topic and fanned out to all matching subscriptions.
+                It will be sent with <code>ContentType: application/json</code> and a generated <code>MessageId</code>.
+            </MudText>
+
+            @* ── Session ID — only rendered when at least one subscription requires it ── *@
+            @if (!_loadingSubscriptions && _allRequireSessions)
+            {
+                @* All subscriptions require sessions — field is mandatory *@
+                <MudTextField T="string"
+                              @bind-Value="_sessionId"
+                              Label="Session ID"
+                              Placeholder="e.g. customer-42"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Immediate="true"
+                              Required="true"
+                              RequiredError="Session ID is required — all subscriptions on this topic require sessions."
+                              Disabled="_sending"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Tag"
+                              HelperText="Every subscription on this topic requires sessions. All messages must carry a Session ID."/>
+            }
+            else if (!_loadingSubscriptions && _someRequireSessions)
+            {
+                @* Mixed — optional but warn about consequences of omitting *@
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                    <strong>@_sessionSubNames.Count</strong> subscription@(_sessionSubNames.Count == 1 ? "" : "s")
+                    on this topic require@(_sessionSubNames.Count == 1 ? "s" : "") sessions:
+                    @string.Join(", ", _sessionSubNames.Select(n => $"\"{n}\"")).
+                    Sending <strong>without</strong> a Session ID will leave those messages
+                    undeliverable until they expire and are dead-lettered.
+                </MudAlert>
+                <MudTextField T="string"
+                              @bind-Value="_sessionId"
+                              Label="Session ID (optional)"
+                              Placeholder="e.g. customer-42"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Immediate="true"
+                              Disabled="_sending"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Tag"
+                              HelperText="Recommended: include a Session ID so session-enabled subscriptions can consume this message."/>
+            }
+            @* No session subscriptions → field hidden entirely *@
+
+            @* ── JSON body ── *@
+            <MudTextField T="string"
+                          Value="@_jsonInput"
+                          ValueChanged="@(v => OnJsonChanged(v))"
+                          Label="Message Body (JSON)"
+                          Placeholder="{&quot;key&quot;: &quot;value&quot;}"
+                          Lines="10"
+                          MaxLines="20"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Immediate="true"
+                          Style="font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:0.875rem;"
+                          Error="_validationError is not null"
+                          ErrorText="@_validationError"
+                          Disabled="_sending"/>
+
+            @* ── Formatted preview ── *@
+            @if (_formattedPreview is not null && _validationError is null)
+            {
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Preview (formatted)</MudText>
+                    <MudPaper Class="pa-3" Elevation="0"
+                              Style="background:var(--mud-palette-surface); border-radius:6px; overflow:auto; max-height:260px; border:1px solid var(--mud-palette-divider);">
+                        <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color:var(--mud-palette-text-primary);">@_formattedPreview</pre>
+                    </MudPaper>
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="_sending">Cancel</MudButton>
+        <MudButton OnClick="SendAsync"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@(_sending ? null : Icons.Material.Filled.Send)"
+                   Disabled="@(!CanSend)"
+                   ButtonType="ButtonType.Button">
+            @if (_sending)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <span>Sending…</span>
+            }
+            else
+            {
+                <span>Send</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired] public string TopicName { get; set; } = string.Empty;
+
+    private string? _jsonInput;
+    private string? _formattedPreview;
+    private string? _validationError;
+    private string? _sessionId;
+    private bool    _sending;
+    private bool    _loadingSubscriptions;
+
+    /// <summary>Names of subscriptions that have RequiresSession = true.</summary>
+    private List<string> _sessionSubNames = [];
+
+    private bool _allRequireSessions;
+    private bool _someRequireSessions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingSubscriptions = true;
+        try
+        {
+            IReadOnlyList<SubscriptionInfo> subs =
+                await TopicService.GetSubscriptionsDetailAsync(TopicName);
+
+            _sessionSubNames = subs
+                .Where(s => s.RequiresSession)
+                .Select(s => s.Name)
+                .ToList();
+
+            _allRequireSessions  = subs.Count > 0 && _sessionSubNames.Count == subs.Count;
+            _someRequireSessions = !_allRequireSessions && _sessionSubNames.Count > 0;
+        }
+        catch
+        {
+            // Non-fatal — degrade gracefully: treat field as plain optional
+            _sessionSubNames    = [];
+            _allRequireSessions = false;
+            _someRequireSessions = false;
+        }
+        finally
+        {
+            _loadingSubscriptions = false;
+        }
+    }
+
+    private bool CanSend =>
+        !_sending &&
+        !string.IsNullOrWhiteSpace(_jsonInput) &&
+        _validationError is null &&
+        (!_allRequireSessions || !string.IsNullOrWhiteSpace(_sessionId));
+
+    private void OnJsonChanged(string? value)
+    {
+        _jsonInput = string.IsNullOrEmpty(value) ? null : value;
+        ValidateJson();
+    }
+
+    private void ValidateJson()
+    {
+        _formattedPreview = null;
+        _validationError  = null;
+
+        if (string.IsNullOrWhiteSpace(_jsonInput))
+            return;
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(_jsonInput);
+            _formattedPreview = JsonSerializer.Serialize(
+                doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException ex)
+        {
+            _validationError = $"Invalid JSON: {ex.Message}";
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        ValidateJson();
+        if (!CanSend || _jsonInput is null) return;
+
+        _sending = true;
+        try
+        {
+            string? sessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId.Trim();
+            await TopicService.SendMessageAsync(TopicName, _jsonInput, sessionId);
+            Snackbar.Add($"Message sent to topic \"{TopicName}\".", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to send message: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

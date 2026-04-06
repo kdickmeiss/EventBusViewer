@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <OutputType>Exe</OutputType>
     </PropertyGroup>
@@ -14,5 +13,8 @@
         <ProjectReference Include="..\..\processing\BusWorks\BusWorks.csproj" />
         <ProjectReference Include="..\BusWorks.Examples.IntegrationEvents\BusWorks.Examples.IntegrationEvents.csproj" />
     </ItemGroup>
-    
+
+    <PropertyGroup>
+        <ExcludeFromCodeCoverage>true</ExcludeFromCodeCoverage>
+    </PropertyGroup>
 </Project>

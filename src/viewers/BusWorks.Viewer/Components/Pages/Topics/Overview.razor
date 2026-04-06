@@ -1,0 +1,359 @@
+@page "/topics/overview"
+@using Azure.Messaging.ServiceBus.Administration
+@using BusWorks.Viewer.Models
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Topics Overview</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Topics Overview</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.AddCircle"
+               OnClick="OpenCreateDialogAsync"
+               Disabled="_loading">
+        New Topic
+    </MudButton>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                   Color="Color.Primary"
+                   OnClick="LoadTopicsAsync"
+                   Disabled="_loading"
+                   title="Refresh topics" />
+</MudStack>
+
+<MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+    Monitor and inspect all active topics and their subscriptions on the event bus.
+</MudText>
+
+@* ── Summary cards ── *@
+<MudGrid Spacing="4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary" Size="Size.Large" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Topics</MudText>
+                    <MudText Typo="Typo.h5">@_topics.Count</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Subscriptions" Color="Color.Secondary" Size="Size.Large" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Subscriptions</MudText>
+                    <MudText Typo="Typo.h5">@_topics.Sum(t => t.SubscriptionCount)</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
+                    <MudText Typo="Typo.h5">@FormatCount(_topics.Sum(t => t.ActiveMessages))</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
+                    <MudText Typo="Typo.h5">@FormatCount(_topics.Sum(t => t.DeadLetterMessages))</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* ── Error alert ── *@
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-6" ShowCloseIcon="true"
+              CloseIconClicked="() => _error = null">
+        @_error
+    </MudAlert>
+}
+
+@* ── Topic table ── *@
+<MudTable Items="@_topics"
+          Hover="true"
+          Striped="true"
+          Elevation="2"
+          Class="mt-6"
+          Loading="_loading"
+          LoadingProgressColor="Color.Primary"
+          Filter="FilterFunc"
+          Dense="true"
+          T="TopicInfo">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Topics</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchTerm"
+                      Placeholder="Search by name…"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium"
+                      Immediate="true"
+                      Class="mt-0" />
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Name)">Name</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.SubscriptionCount)">Subscriptions
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.DeadLetterMessages)">Dead-letter
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="width:50px"></MudTh>
+        <MudTh Style="width:50px"></MudTh>
+        <MudTh Style="width:50px"></MudTh>
+        <MudTh Style="width:50px"></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Topic"
+                       Size="Size.Small"
+                       Href="@($"/topics/{Uri.EscapeDataString(context.Name)}")">
+                @context.Name
+            </MudButton>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string"
+                     Color="@StatusColor(context.Status)"
+                     Size="Size.Small"
+                     Variant="Variant.Filled">
+                @context.Status.ToString()
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Subscriptions" Style="text-align:right">
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small"
+                     Variant="Variant.Text">@context.SubscriptionCount</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Active" Style="text-align:right">
+            <MudChip T="string" Color="Color.Success" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Dead-letter" Style="text-align:right">
+            @if (context.DeadLetterMessages > 0)
+            {
+                <MudChip T="string" Color="Color.Error" Size="Size.Small"
+                         Variant="Variant.Text">@FormatCount(context.DeadLetterMessages)</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text">0</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Total" Style="text-align:right">
+            <MudChip T="string" Color="Color.Info" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Send message to topic">
+                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                               Size="Size.Small"
+                               Color="Color.Secondary"
+                               title="Send message"
+                               OnClick="@(() => OpenSendDialogAsync(context))" />
+            </MudTooltip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Edit topic settings">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               title="Edit topic"
+                               OnClick="@(() => OpenEditDialogAsync(context.Name))" />
+            </MudTooltip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudTooltip Text="Delete topic">
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               title="Delete topic"
+                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))" />
+            </MudTooltip>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           title="View topic details"
+                           Href="@($"/topics/{Uri.EscapeDataString(context.Name)}")" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body1" Color="Color.Secondary">No topics found.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private bool _loading;
+    private string? _error;
+    private string? _searchTerm;
+    private List<TopicInfo> _topics = [];
+
+    protected override Task OnInitializedAsync() => LoadTopicsAsync();
+
+    private async Task LoadTopicsAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        _error = null;
+
+        try
+        {
+            IReadOnlyList<TopicInfo> result = await TopicService.GetAllTopicsAsync();
+            _topics = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load topics: {ex.Message}";
+            Snackbar.Add(_error, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Opens the send-message dialog for the given topic.</summary>
+    private async Task OpenSendDialogAsync(TopicInfo topic)
+    {
+        var parameters = new DialogParameters<SendTopicMessageDialog>
+        {
+            { x => x.TopicName, topic.Name }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<SendTopicMessageDialog>(
+            $"Send Message — {topic.Name}", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadTopicsAsync();
+    }
+
+    /// <summary>Opens the create-topic dialog and refreshes the list on success.</summary>
+    private async Task OpenCreateDialogAsync()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<CreateTopicDialog>("", options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadTopicsAsync();
+    }
+
+    /// <summary>Opens the edit-topic dialog and refreshes the list on success.</summary>
+    private async Task OpenEditDialogAsync(string topicName)
+    {
+        var parameters = new DialogParameters<UpdateTopicDialog>
+        {
+            { x => x.TopicName, topicName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<UpdateTopicDialog>(
+            "", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadTopicsAsync();
+    }
+
+    /// <summary>Opens the delete-topic confirmation dialog and refreshes the list on success.</summary>
+    private async Task OpenDeleteDialogAsync(string topicName)
+    {
+        var parameters = new DialogParameters<DeleteTopicDialog>
+        {
+            { x => x.TopicName, topicName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<DeleteTopicDialog>(
+            "Confirm Deletion", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadTopicsAsync();
+    }
+
+    /// <summary>Client-side filter for the search text field.</summary>
+    private bool FilterFunc(TopicInfo topic) =>
+        string.IsNullOrWhiteSpace(_searchTerm)
+        || topic.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Peek caps at 250 — show "250+" when we hit the cap.</summary>
+    private static string FormatCount(int count) => count >= 250 ? "250+" : count.ToString();
+
+    private static Color StatusColor(EntityStatus status)
+    {
+        if (status == EntityStatus.Active) return Color.Success;
+        if (status == EntityStatus.Disabled) return Color.Error;
+        if (status == EntityStatus.SendDisabled) return Color.Warning;
+        if (status == EntityStatus.ReceiveDisabled) return Color.Warning;
+        return Color.Default;
+    }
+
+}
+
+
+

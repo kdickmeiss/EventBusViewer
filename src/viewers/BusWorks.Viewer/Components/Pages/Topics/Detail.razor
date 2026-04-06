@@ -1,0 +1,649 @@
+@page "/topics/{TopicName}"
+@using Azure.Messaging.ServiceBus
+@using Azure.Messaging.ServiceBus.Administration
+@using BusWorks.Viewer.Models
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@TopicName — Topic Detail</PageTitle>
+
+@* ── Breadcrumb + actions ── *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0" />
+    <MudSpacer />
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                   Color="Color.Primary"
+                   OnClick="LoadAllAsync"
+                   Disabled="_loadingDetail"
+                   title="Refresh" />
+    <MudButton Variant="Variant.Outlined"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/topics/overview">
+        Back
+    </MudButton>
+</MudStack>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4"
+              ShowCloseIcon="true" CloseIconClicked="() => _error = null">
+        @_error
+    </MudAlert>
+}
+
+@if (_loadingDetail)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_detail is not null)
+{
+    @* ── Topic Properties Panel ── *@
+    <MudPaper Class="pa-5 mb-6" Elevation="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary" />
+            <MudText Typo="Typo.h5">@_detail.Name</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Send"
+                       Size="Size.Small"
+                       OnClick="OpenSendDialogAsync">
+                Send Message
+            </MudButton>
+            <MudChip T="string"
+                     Color="@StatusColor(_detail.Status)"
+                     Variant="Variant.Filled"
+                     Size="Size.Small">
+                @_detail.Status.ToString()
+            </MudChip>
+        </MudStack>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="3">
+                <MudField Label="Message TTL" Variant="Variant.Outlined">
+                    @FormatDuration(_detail.DefaultMessageTimeToLive)
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudField Label="Max Size (MB)" Variant="Variant.Outlined">
+                    @_detail.MaxSizeInMegabytes
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudField Label="Batched Operations" Variant="Variant.Outlined">
+                    @FormatBool(_detail.EnableBatchedOperations)
+                </MudField>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudField Label="Partitioning" Variant="Variant.Outlined">
+                    @FormatBool(_detail.EnablePartitioning)
+                </MudField>
+            </MudItem>
+        </MudGrid>
+
+        @* ── Aggregate counters ── *@
+        <MudDivider Class="my-4" />
+        <MudStack Row="true" Spacing="6">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Subscriptions</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Secondary">@_detail.Subscriptions.Count</MudText>
+            </MudStack>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Success">@FormatCount(_detail.TotalActiveMessages)</MudText>
+            </MudStack>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
+                <MudText Typo="Typo.h6" Color="@(_detail.TotalDeadLetterMessages > 0 ? Color.Error : Color.Default)">
+                    @FormatCount(_detail.TotalDeadLetterMessages)
+                </MudText>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    @* ── Subscriptions section ── *@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudText Typo="Typo.h6">Subscriptions</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AddCircle"
+                   Size="Size.Small"
+                   OnClick="OpenCreateSubscriptionDialogAsync">
+            New Subscription
+        </MudButton>
+    </MudStack>
+
+    @if (_detail.Subscriptions.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-6">
+            No subscriptions yet. Create one to start receiving messages.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@_detail.Subscriptions"
+                  Hover="true"
+                  Striped="true"
+                  Elevation="2"
+                  Dense="true"
+                  T="SubscriptionInfo"
+                  RowClassFunc="SubscriptionRowClass">
+            <HeaderContent>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.Name)">Name</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.Status.ToString())">Status
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.RequiresSession)">Session
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="text-align:right">
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.MaxDeliveryCount)">Max
+                        Delivery
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="text-align:right">
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.ActiveMessages)">Active
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="text-align:right">
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.DeadLetterMessages)">
+                        Dead-letter
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="text-align:right">
+                    <MudTableSortLabel SortBy="new Func<SubscriptionInfo, object>(x => x.TotalMessages)">Total
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="width:50px"></MudTh>
+                <MudTh Style="width:50px"></MudTh>
+                <MudTh Style="width:50px"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Inherit"
+                               StartIcon="@Icons.Material.Filled.Subscriptions"
+                               Size="Size.Small"
+                               OnClick="@(() => SelectSubscriptionAsync(context))">
+                        @context.Name
+                    </MudButton>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string"
+                             Color="@StatusColor(context.Status)"
+                             Size="Size.Small"
+                             Variant="Variant.Filled">
+                        @context.Status.ToString()
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Session">
+                    @if (context.RequiresSession)
+                    {
+                        <MudTooltip Text="Sessions required">
+                            <MudChip T="string" Color="Color.Tertiary" Size="Size.Small"
+                                     Variant="Variant.Outlined" Icon="@Icons.Material.Filled.AccountTree">
+                                Session
+                            </MudChip>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default">—</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Max Delivery" Style="text-align:right">
+                    <MudText Typo="Typo.body2">@context.MaxDeliveryCount</MudText>
+                </MudTd>
+                <MudTd DataLabel="Active" Style="text-align:right">
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">
+                        @FormatCount(context.ActiveMessages)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Dead-letter" Style="text-align:right">
+                    @if (context.DeadLetterMessages > 0)
+                    {
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">
+                            @FormatCount(context.DeadLetterMessages)
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text">0</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Total" Style="text-align:right">
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">
+                        @FormatCount(context.TotalMessages)
+                    </MudChip>
+                </MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="Edit subscription settings">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       title="Edit subscription"
+                                       OnClick="@(() => OpenEditSubscriptionDialogAsync(context.Name))" />
+                    </MudTooltip>
+                </MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="Browse messages">
+                        <MudIconButton Icon="@Icons.Material.Filled.Inbox"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       title="Browse messages"
+                                       OnClick="@(() => SelectSubscriptionAsync(context))" />
+                    </MudTooltip>
+                </MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="Delete subscription">
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       title="Delete subscription"
+                                       OnClick="@(() => OpenDeleteSubscriptionDialogAsync(context.Name))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">No subscriptions found.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+
+    @* ── Message browser (shown when a subscription is selected) ── *@
+    @if (_selectedSubscription is { } sub)
+    {
+        <MudPaper Class="pa-0 mt-6" Elevation="2" @key="sub.Name">
+            @* ── Panel header ── *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="px-4 py-3">
+                <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Primary" Class="mr-1" />
+                <MudText Typo="Typo.subtitle1">
+                    Messages — <strong>@sub.Name</strong>
+                </MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               title="Refresh messages"
+                               Disabled="@(_loadingActive || _loadingDeadLetter)"
+                               OnClick="@(() => SelectSubscriptionAsync(sub))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               Color="Color.Default"
+                               title="Close"
+                               OnClick="CloseMessageBrowser" />
+            </MudStack>
+            <MudDivider />
+
+            @* ── Subscription properties strip ── *@
+            <MudStack Row="true" Spacing="4" Class="px-4 py-2" Style="flex-wrap:wrap;">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Max Delivery</MudText>
+                    <MudText Typo="Typo.body2">@sub.MaxDeliveryCount</MudText>
+                </MudStack>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Lock Duration</MudText>
+                    <MudText Typo="Typo.body2">@FormatDuration(sub.LockDuration)</MudText>
+                </MudStack>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Message TTL</MudText>
+                    <MudText Typo="Typo.body2">@FormatDuration(sub.DefaultMessageTimeToLive)</MudText>
+                </MudStack>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Requires Session</MudText>
+                    <MudText Typo="Typo.body2">@FormatBool(sub.RequiresSession)</MudText>
+                </MudStack>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter on Expiry</MudText>
+                    <MudText Typo="Typo.body2">@FormatBool(sub.DeadLetteringOnMessageExpiration)</MudText>
+                </MudStack>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Batched Operations</MudText>
+                    <MudText Typo="Typo.body2">@FormatBool(sub.EnableBatchedOperations)</MudText>
+                </MudStack>
+            </MudStack>
+            <MudDivider />
+
+            @* ── Message tabs ── *@
+            <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true" Class="pa-0">
+                <MudTabPanel Text="@($"Active ({FormatCount(sub.ActiveMessages)})")"
+                             Icon="@Icons.Material.Filled.Inbox">
+                    <div class="pa-4">
+                        @if (_loadingActive)
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+                        }
+                        else if (_activeMessages.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Text" Class="my-2">
+                                No active messages in this subscription.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudStack Spacing="0">
+                                @foreach (ServiceBusReceivedMessage msg in _activeMessages)
+                                {
+                                    <MessageCard Message="msg" IsDeadLetter="false" />
+                                }
+                            </MudStack>
+                            @if (_activeMessages.Count >= PageSize)
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.ExpandMore"
+                                           OnClick="LoadMoreActiveAsync"
+                                           Disabled="_loadingActive"
+                                           FullWidth="true"
+                                           Class="mt-2">
+                                    Load more
+                                </MudButton>
+                            }
+                        }
+                    </div>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@($"Dead-letter ({FormatCount(sub.DeadLetterMessages)})")"
+                             Icon="@Icons.Material.Filled.ErrorOutline">
+                    <div class="pa-4">
+                        @if (_loadingDeadLetter)
+                        {
+                            <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4" />
+                        }
+                        else if (_deadLetterMessages.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Class="my-2">
+                                No dead-letter messages — looking good!
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudStack Spacing="0">
+                                @foreach (ServiceBusReceivedMessage msg in _deadLetterMessages)
+                                {
+                                    <MessageCard Message="msg" IsDeadLetter="true" />
+                                }
+                            </MudStack>
+                            @if (_deadLetterMessages.Count >= PageSize)
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.ExpandMore"
+                                           OnClick="LoadMoreDeadLetterAsync"
+                                           Disabled="_loadingDeadLetter"
+                                           FullWidth="true"
+                                           Class="mt-2">
+                                    Load more
+                                </MudButton>
+                            }
+                        }
+                    </div>
+                </MudTabPanel>
+            </MudTabs>
+        </MudPaper>
+    }
+}
+
+@code {
+    private const int PageSize = 25;
+
+    [Parameter] public string TopicName { get; set; } = string.Empty;
+
+    private TopicDetail? _detail;
+    private string? _error;
+    private bool _loadingDetail;
+    private bool _loadingActive;
+    private bool _loadingDeadLetter;
+
+    private SubscriptionInfo? _selectedSubscription;
+    private List<ServiceBusReceivedMessage> _activeMessages = [];
+    private List<ServiceBusReceivedMessage> _deadLetterMessages = [];
+    private long _activeSequenceCursor;
+    private long _deadLetterSequenceCursor;
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs =
+        [
+            new BreadcrumbItem("Topics", href: "/topics/overview", icon: Icons.Material.Filled.Topic),
+            new BreadcrumbItem(TopicName, href: null, disabled: true)
+        ];
+
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        _loadingDetail = true;
+        _error = null;
+        _selectedSubscription = null;
+        _activeMessages = [];
+        _deadLetterMessages = [];
+
+        try
+        {
+            _detail = await TopicService.GetTopicDetailAsync(TopicName);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load topic: {ex.Message}";
+            Snackbar.Add(_error, Severity.Error);
+        }
+        finally
+        {
+            _loadingDetail = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Subscription selection ────────────────────────────────────────────────
+
+    private async Task SelectSubscriptionAsync(SubscriptionInfo sub)
+    {
+        _selectedSubscription = sub;
+        _activeMessages = [];
+        _deadLetterMessages = [];
+        _activeSequenceCursor = 0;
+        _deadLetterSequenceCursor = 0;
+
+        await Task.WhenAll(LoadActivePageAsync(), LoadDeadLetterPageAsync());
+    }
+
+    private void CloseMessageBrowser()
+    {
+        _selectedSubscription = null;
+        _activeMessages = [];
+        _deadLetterMessages = [];
+    }
+
+    // ── Message paging ────────────────────────────────────────────────────────
+
+    private async Task LoadActivePageAsync()
+    {
+        _loadingActive = true;
+        try
+        {
+            IReadOnlyList<ServiceBusReceivedMessage> page =
+                await TopicService.PeekSubscriptionMessagesPagedAsync(
+                    TopicName, _selectedSubscription!.Name, PageSize, _activeSequenceCursor, fromDeadLetter: false);
+
+            _activeMessages.AddRange(page);
+            if (page.Count > 0)
+                _activeSequenceCursor = page[^1].SequenceNumber + 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load active messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingActive = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDeadLetterPageAsync()
+    {
+        _loadingDeadLetter = true;
+        try
+        {
+            IReadOnlyList<ServiceBusReceivedMessage> page =
+                await TopicService.PeekSubscriptionMessagesPagedAsync(
+                    TopicName, _selectedSubscription!.Name, PageSize, _deadLetterSequenceCursor, fromDeadLetter: true);
+
+            _deadLetterMessages.AddRange(page);
+            if (page.Count > 0)
+                _deadLetterSequenceCursor = page[^1].SequenceNumber + 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load dead-letter messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingDeadLetter = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task LoadMoreActiveAsync() => LoadActivePageAsync();
+    private Task LoadMoreDeadLetterAsync() => LoadDeadLetterPageAsync();
+
+    // ── Dialog helpers ────────────────────────────────────────────────────────
+
+    private async Task OpenSendDialogAsync()
+    {
+        var parameters = new DialogParameters<SendTopicMessageDialog>
+        {
+            { x => x.TopicName, TopicName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<SendTopicMessageDialog>(
+            $"Send Message — {TopicName}", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAllAsync();
+    }
+
+    private async Task OpenEditSubscriptionDialogAsync(string subscriptionName)
+    {
+        var parameters = new DialogParameters<UpdateSubscriptionDialog>
+        {
+            { x => x.TopicName, TopicName },
+            { x => x.SubscriptionName, subscriptionName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog =
+            await DialogService.ShowAsync<UpdateSubscriptionDialog>("", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAllAsync();
+    }
+
+    private async Task OpenCreateSubscriptionDialogAsync()
+    {
+        var parameters = new DialogParameters<CreateSubscriptionDialog>
+        {
+            { x => x.TopicName, TopicName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog =
+            await DialogService.ShowAsync<CreateSubscriptionDialog>("", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAllAsync();
+    }
+
+    private async Task OpenDeleteSubscriptionDialogAsync(string subscriptionName)
+    {
+        var parameters = new DialogParameters<DeleteSubscriptionDialog>
+        {
+            { x => x.TopicName, TopicName },
+            { x => x.SubscriptionName, subscriptionName }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog =
+            await DialogService.ShowAsync<DeleteSubscriptionDialog>("Confirm Deletion", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            // If the deleted subscription was selected, close the browser panel
+            if (_selectedSubscription?.Name == subscriptionName)
+                CloseMessageBrowser();
+
+            await LoadAllAsync();
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private string SubscriptionRowClass(SubscriptionInfo sub, int _) =>
+        sub.Name == _selectedSubscription?.Name ? "mud-selected-item" : string.Empty;
+
+    private static string FormatBool(bool value) => value ? "Yes" : "No";
+
+    private static string FormatCount(int count) => count >= 250 ? "250+" : count.ToString();
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1) return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        return $"{ts.TotalSeconds}s";
+    }
+
+    private static Color StatusColor(EntityStatus status)
+    {
+        if (status == EntityStatus.Active) return Color.Success;
+        if (status == EntityStatus.Disabled) return Color.Error;
+        if (status == EntityStatus.SendDisabled) return Color.Warning;
+        return status == EntityStatus.ReceiveDisabled ? Color.Warning : Color.Default;
+    }
+
+}

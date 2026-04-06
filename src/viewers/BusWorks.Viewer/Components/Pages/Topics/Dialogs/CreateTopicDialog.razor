@@ -1,19 +1,19 @@
-﻿@using BusWorks.Viewer.Services
-@inject QueueService QueueService
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
 @inject ISnackbar Snackbar
 
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary"/>
-            <MudText Typo="Typo.h6">Create Queue</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Create Topic</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
         @* ── Loading bar — visible as soon as the button is clicked ── *@
         @if (_creating)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
         }
         <MudForm @ref="_form" @bind-IsValid="_formValid">
             <MudStack Spacing="4">
@@ -21,53 +21,38 @@
                 @* ── Name ── *@
                 <MudTextField T="string"
                               @bind-Value="_name"
-                              Label="Queue Name"
+                              Label="Topic Name"
                               Variant="Variant.Outlined"
                               Required="true"
-                              RequiredError="Queue name is required."
-                              Placeholder="e.g. orders.created"
+                              RequiredError="Topic name is required."
+                              Placeholder="e.g. orders.events"
                               Immediate="true"
                               Disabled="_creating"
                               Error="@(_nameError is not null)"
                               ErrorText="@_nameError"
-                              OnBlur="@(_ => _nameError = null)"/>
+                              OnBlur="@(_ => _nameError = null)" />
 
-                <MudDivider/>
+                <MudDivider />
 
-                @* ── Numeric settings ── *@
+                @* ── TTL ── *@
                 <MudNumericField T="int"
-                                 @bind-Value="_maxDeliveryCount"
-                                 Label="Max Delivery Count"
+                                 @bind-Value="_defaultMessageTtlSeconds"
+                                 Label="Default Message TTL (seconds)"
                                  Variant="Variant.Outlined"
                                  Min="1"
+                                 Max="3600"
                                  Required="true"
                                  Disabled="_creating"
-                                 HelperText="How many times delivery is attempted before the message is dead-lettered."/>
+                                 HelperText="How long a message is retained if not consumed (1 – 3 600 s / up to 1 hour). Emulator limit." />
 
-                <MudNumericField T="int"
-                                 @bind-Value="_lockDurationSeconds"
-                                 Label="Lock Duration (seconds)"
-                                 Variant="Variant.Outlined"
-                                 Min="1"
-                                 Max="300"
-                                 Required="true"
-                                 Disabled="_creating"
-                                 HelperText="How long a received message stays locked (1 – 300 s)."/>
-
-                <MudDivider/>
+                <MudDivider />
 
                 @* ── Toggles ── *@
                 <MudSwitch T="bool"
-                           @bind-Value="_requiresSession"
-                           Label="Requires Session"
+                           @bind-Value="_enableBatchedOperations"
+                           Label="Enable Batched Operations"
                            Color="Color.Primary"
-                           Disabled="_creating"/>
-
-                <MudSwitch T="bool"
-                           @bind-Value="_deadLetterOnExpiry"
-                           Label="Dead-letter on Message Expiry"
-                           Color="Color.Primary"
-                           Disabled="_creating"/>
+                           Disabled="_creating" />
 
             </MudStack>
         </MudForm>
@@ -86,7 +71,7 @@
                    Disabled="@(_creating || !_formValid)">
             @if (_creating)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Creating…</span>
             }
             else
@@ -105,15 +90,12 @@
 
     private string? _name;
     private string? _nameError;
-    private int _maxDeliveryCount = 10;
-    private int _lockDurationSeconds = 60;
-    private bool _requiresSession;
-    private bool _deadLetterOnExpiry;
+    private int _defaultMessageTtlSeconds = 3600;
+    private bool _enableBatchedOperations = true;
     private bool _creating;
 
     private async Task CreateAsync()
     {
-        // Disable everything immediately — prevents double-submit and shows feedback at once
         _creating = true;
         try
         {
@@ -121,26 +103,24 @@
             if (!_formValid) return;
 
             _nameError = null;
-            bool exists = await QueueService.QueueExistsAsync(_name!);
+            bool exists = await TopicService.TopicExistsAsync(_name!);
             if (exists)
             {
-                _nameError = $"A queue named \"{_name}\" already exists.";
+                _nameError = $"A topic named \"{_name}\" already exists.";
                 return;
             }
 
-            await QueueService.CreateQueueAsync(
+            await TopicService.CreateTopicAsync(
                 _name!,
-                _requiresSession,
-                _maxDeliveryCount,
-                _lockDurationSeconds,
-                _deadLetterOnExpiry);
+                _defaultMessageTtlSeconds,
+                _enableBatchedOperations);
 
-            Snackbar.Add($"Queue \"{_name}\" created successfully.", Severity.Success);
+            Snackbar.Add($"Topic \"{_name}\" created successfully.", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to create queue: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Failed to create topic: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -150,3 +130,4 @@
 
     private void Cancel() => MudDialog.Cancel();
 }
+

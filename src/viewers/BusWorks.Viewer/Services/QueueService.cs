@@ -4,65 +4,14 @@ using BusWorks.Viewer.Models;
 
 namespace BusWorks.Viewer.Services;
 
-public sealed class QueueService : IDisposable
+public sealed class QueueService
 {
-    private readonly SettingsService _settings;
-    private ServiceBusAdministrationClient? _adminClient;
-    private ServiceBusClient? _serviceBusClient;
-    private string? _lastAdminCs;
-    private string? _lastClientCs;
+    private readonly ServiceBusClientProvider _clients;
 
-    public QueueService(SettingsService settings)
-    {
-        _settings = settings;
-        _settings.OnChange += InvalidateClients;
-    }
+    public QueueService(ServiceBusClientProvider clients) => _clients = clients;
 
-    private ServiceBusAdministrationClient AdminClient
-    {
-        get
-        {
-            string cs = _settings.ServiceBus.AdministrationConnectionString;
-            if (_adminClient is null || _lastAdminCs != cs)
-            {
-                _lastAdminCs = cs;
-                _adminClient = new ServiceBusAdministrationClient(cs);
-            }
-            return _adminClient;
-        }
-    }
-
-    private ServiceBusClient BusClient
-    {
-        get
-        {
-            string cs = _settings.ServiceBus.ClientConnectionString;
-            if (_serviceBusClient is null || _lastClientCs != cs)
-            {
-                _lastClientCs = cs;
-                ServiceBusClient? old = _serviceBusClient;
-                _serviceBusClient = new ServiceBusClient(cs);
-                old?.DisposeAsync().AsTask().ContinueWith(_ => { });
-            }
-            return _serviceBusClient;
-        }
-    }
-
-    private void InvalidateClients()
-    {
-        _adminClient = null;
-        ServiceBusClient? old = _serviceBusClient;
-        _serviceBusClient = null;
-        _lastAdminCs = null;
-        _lastClientCs = null;
-        old?.DisposeAsync().AsTask().ContinueWith(_ => { });
-    }
-
-    public void Dispose()
-    {
-        _settings.OnChange -= InvalidateClients;
-        _serviceBusClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-    }
+    private ServiceBusAdministrationClient AdminClient => _clients.AdminClient;
+    private ServiceBusClient BusClient => _clients.BusClient;
 
 
     /// <summary>
@@ -200,4 +149,3 @@ public sealed class QueueService : IDisposable
         return AdminClient.CreateQueueAsync(options, cancellationToken);
     }
 }
-

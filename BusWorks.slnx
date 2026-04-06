@@ -24,7 +24,6 @@
         <Project Path="src\processing\BusWorks\BusWorks.csproj" />
     </Folder>
     <Folder Name="/src/viewers/">
-        <Project Path="src\viewers\BusWorks.Viewer.Console\BusWorks.Viewer.Console.csproj" />
         <Project Path="src\viewers\BusWorks.Viewer\BusWorks.Viewer.csproj" />
     </Folder>
     <Folder Name="/tests/">

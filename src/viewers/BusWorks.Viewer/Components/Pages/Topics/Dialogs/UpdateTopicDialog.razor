@@ -1,0 +1,196 @@
+@using Azure.Messaging.ServiceBus.Administration
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Edit Topic</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@TopicName</MudChip>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading || _saving)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_loadError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+        }
+        else if (_props is not null)
+        {
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+                <MudStack Spacing="4">
+
+                    @* ── Status ── *@
+                    <MudSelect T="EntityStatus"
+                               Value="_status"
+                               ValueChanged="@(v => _status = v)"
+                               Label="Status"
+                               Variant="Variant.Outlined"
+                               Disabled="_saving"
+                               HelperText="Active allows full use. Disabled blocks all operations. SendDisabled / ReceiveDisabled restrict one direction.">
+                        <MudSelectItem Value="EntityStatus.Active">Active</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.Disabled">Disabled</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.SendDisabled">Send Disabled</MudSelectItem>
+                        <MudSelectItem Value="EntityStatus.ReceiveDisabled">Receive Disabled</MudSelectItem>
+                    </MudSelect>
+
+                    <MudDivider />
+
+                    @* ── Default Message TTL ── *@
+                    @if (_ttlIsMax)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-0">
+                            The current TTL is set to <strong>never expire</strong> (TimeSpan.MaxValue).
+                            Enter a value in seconds below to override it.
+                        </MudAlert>
+                    }
+                    <MudNumericField T="long"
+                                     @bind-Value="_defaultMessageTtlSeconds"
+                                     Label="Default Message TTL (seconds)"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Required="true"
+                                     Disabled="_saving"
+                                     HelperText="How long a message is retained if not consumed. E.g. 3 600 = 1 h · 86 400 = 1 day · 604 800 = 1 week." />
+
+                    <MudDivider />
+
+                    @* ── Toggles ── *@
+                    <MudSwitch T="bool"
+                               @bind-Value="_enableBatchedOperations"
+                               Label="Enable Batched Operations"
+                               Color="Color.Primary"
+                               Disabled="_saving" />
+
+                    @* ── Read-only info ── *@
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Read-only properties</MudText>
+                    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.Storage"
+                                 Color="Color.Default">
+                            Max Size: @_props.MaxSizeInMegabytes MB
+                        </MudChip>
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.AccountTree"
+                                 Color="@(_props.EnablePartitioning ? Color.Tertiary : Color.Default)">
+                            Partitioning: @(_props.EnablePartitioning ? "Enabled" : "Disabled")
+                        </MudChip>
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.FindReplace"
+                                 Color="@(_props.RequiresDuplicateDetection ? Color.Info : Color.Default)">
+                            Duplicate Detection: @(_props.RequiresDuplicateDetection ? "Enabled" : "Disabled")
+                        </MudChip>
+                    </MudStack>
+
+                </MudStack>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel"
+                   Variant="Variant.Text"
+                   Disabled="_saving">
+            Cancel
+        </MudButton>
+        <MudButton OnClick="SaveAsync"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@(_saving ? null : Icons.Material.Filled.Save)"
+                   ButtonType="ButtonType.Button"
+                   Disabled="@(_loading || _saving || !_formValid || _loadError is not null)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Saving…</span>
+            }
+            else
+            {
+                <span>Save</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired] public string TopicName { get; set; } = string.Empty;
+
+    private MudForm _form = null!;
+    private bool _formValid = true;
+
+    private TopicProperties? _props;
+    private string? _loadError;
+    private bool _loading;
+    private bool _saving;
+
+    private EntityStatus _status;
+    private long _defaultMessageTtlSeconds;
+    private bool _enableBatchedOperations;
+
+    /// <summary>True when the topic's TTL was TimeSpan.MaxValue (never expire).</summary>
+    private bool _ttlIsMax;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            _props = await TopicService.GetTopicPropertiesAsync(TopicName);
+
+            _status = _props.Status;
+            _enableBatchedOperations = _props.EnableBatchedOperations;
+
+            _ttlIsMax = _props.DefaultMessageTimeToLive == TimeSpan.MaxValue;
+            _defaultMessageTtlSeconds = _ttlIsMax
+                ? 3_600 // sensible default shown when overriding a "never-expire" TTL
+                : (long)_props.DefaultMessageTimeToLive.TotalSeconds;
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to load topic properties: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            await _form.ValidateAsync();
+            if (!_formValid) return;
+
+            // Apply editable settings back onto the live properties object
+            _props!.Status = _status;
+            _props.EnableBatchedOperations = _enableBatchedOperations;
+            _props.DefaultMessageTimeToLive = TimeSpan.FromSeconds(_defaultMessageTtlSeconds);
+
+            await TopicService.UpdateTopicAsync(_props);
+            Snackbar.Add($"Topic \"{TopicName}\" updated successfully.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save topic: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+
+

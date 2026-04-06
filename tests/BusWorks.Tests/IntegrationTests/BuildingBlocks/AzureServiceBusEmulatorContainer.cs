@@ -4,7 +4,6 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 using Testcontainers.MsSql;
 using Testcontainers.ServiceBus;
-using TUnit.Core.Interfaces;
 
 namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
@@ -17,7 +16,7 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// Entity provisioning (queues, topics, subscriptions) is intentionally <b>not</b> done here —
 /// each test class declares the entities it needs by overriding <c>EventBusTestBase.ProvisionEntitiesAsync</c>.
 /// </remarks>
-internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsyncDisposable
+public sealed class AzureServiceBusEmulatorContainer
 {
     /// <summary>AMQP port used by <see cref="ServiceBusClient"/> for messaging.</summary>
     private const ushort AmqpPort = 5672;
@@ -26,8 +25,6 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
     private const ushort HttpPort = 5300;
 
     private readonly ServiceBusContainer _container;
-
-    private ServiceBusAdministrationClient _adminClient = null!;
 
     /// <summary>
     /// Connection string for the AMQP endpoint.
@@ -46,13 +43,13 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
     /// Test classes obtain this via the <c>EventBusTestBase</c> helper methods —
     /// call it directly only when you need low-level control over entity options.
     /// </summary>
-    public ServiceBusAdministrationClient AdminClient => _adminClient;
-    
+    public ServiceBusAdministrationClient AdminClient { get; private set; } = null!;
+
     public AzureServiceBusEmulatorContainer()
     {
         // 1. Create a network for the SQL Edge container
         INetwork? network = new NetworkBuilder().Build();
-        
+
         // 2. Create the SQL Edge container
         MsSqlContainer? sqlContainer = new MsSqlBuilder("mcr.microsoft.com/azure-sql-edge:latest")
             .WithNetwork(network)
@@ -61,13 +58,13 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
             .WithEnvironment("MSSQL_SA_PASSWORD", "Your_password123")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1433))
             .Build();
-        
+
         // 3. Create the Service Bus emulator container, linking to the SQL Edge container
         _container = new ServiceBusBuilder("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
             .WithMsSqlContainer(network, sqlContainer, "sql-edge", "Your_password123")
             .WithAcceptLicenseAgreement(true)
             .Build();
-        
+
         // _container = new ServiceBusBuilder("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
         //     .WithAcceptLicenseAgreement(true)
         //     // Bind both the AMQP and the HTTP management ports to random host ports so
@@ -84,9 +81,7 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
         //                 r.ForPort(HttpPort).ForPath("/health")))
         //     .Build();
     }
-    
 
-    /// <inheritdoc />
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
@@ -105,17 +100,12 @@ internal sealed class AzureServiceBusEmulatorContainer : IAsyncInitializer, IAsy
             "UseDevelopmentEmulator=true;";
 
         Client = new ServiceBusClient(ConnectionString);
-        _adminClient = new ServiceBusAdministrationClient(adminConnectionString);
+        AdminClient = new ServiceBusAdministrationClient(adminConnectionString);
     }
 
-    // ── IAsyncDisposable ──────────────────────────────────────────────────────
-
-    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await Client.DisposeAsync();
         await _container.DisposeAsync();
     }
 }
-
-

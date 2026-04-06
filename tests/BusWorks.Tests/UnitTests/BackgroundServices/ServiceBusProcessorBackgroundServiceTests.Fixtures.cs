@@ -1,11 +1,12 @@
-using BusWorks.Abstractions;
 using BusWorks.Abstractions.Attributes;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
+using Xunit;
 
 namespace BusWorks.Tests.UnitTests.BackgroundServices;
 
-internal sealed partial class ServiceBusProcessorBackgroundServiceTests
+[Trait("Category", "Unit")]
+public sealed partial class ServiceBusProcessorBackgroundServiceTests
 {
     // ── Message types ─────────────────────────────────────────────────────────
 
@@ -49,13 +50,13 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
         public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
-    [ServiceBusQueue]  // Queue consumer, but message type has [TopicRoute]
+    [ServiceBusQueue] // Queue consumer, but message type has [TopicRoute]
     private sealed class QueueConsumerWithTopicMessage : IConsumer<TopicMessage>
     {
         public Task Consume(IConsumeContext<TopicMessage> context) => Task.CompletedTask;
     }
 
-    [ServiceBusQueue]  // Queue consumer, but message type has no route attribute
+    [ServiceBusQueue] // Queue consumer, but message type has no route attribute
     private sealed class QueueConsumerWithUnroutedMessage : IConsumer<UnroutedMessage>
     {
         public Task Consume(IConsumeContext<UnroutedMessage> context) => Task.CompletedTask;
@@ -81,13 +82,13 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
         public Task Consume(IConsumeContext<TopicMessage> context) => Task.CompletedTask;
     }
 
-    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has [QueueRoute]
+    [ServiceBusTopic("resort-subscription")] // Topic consumer, but message type has [QueueRoute]
     private sealed class TopicConsumerWithQueueMessage : IConsumer<QueueMessage>
     {
         public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
     }
 
-    [ServiceBusTopic("resort-subscription")]  // Topic consumer, but message type has no route attribute
+    [ServiceBusTopic("resort-subscription")] // Topic consumer, but message type has no route attribute
     private sealed class TopicConsumerWithUnroutedMessage : IConsumer<UnroutedMessage>
     {
         public Task Consume(IConsumeContext<UnroutedMessage> context) => Task.CompletedTask;
@@ -95,24 +96,42 @@ internal sealed partial class ServiceBusProcessorBackgroundServiceTests
 
     // ── Session contract mismatch fixtures ────────────────────────────────────
 
-    [ServiceBusQueue]  // RequireSession = false, but message implements ISessionedEvent
+    [ServiceBusQueue] // RequireSession = false, but message implements ISessionedEvent
     private sealed class NonSessionConsumerForSessionedMessage : IConsumer<SessionMessage>
     {
         public Task Consume(IConsumeContext<SessionMessage> context) => Task.CompletedTask;
     }
 
-    [ServiceBusQueue(RequireSession = true)]  // RequireSession = true, but message does NOT implement ISessionedEvent
+    [ServiceBusQueue(RequireSession = true)] // RequireSession = true, but message does NOT implement ISessionedEvent
     private sealed class SessionConsumerForNonSessionedMessage : IConsumer<QueueMessage>
     {
         public Task Consume(IConsumeContext<QueueMessage> context) => Task.CompletedTask;
+    }
+
+    // ── Consumers that do NOT implement IConsumer<T> ─────────────────────────
+
+    // [ServiceBusQueue] without explicit name AND without IConsumer<T>:
+    // ResolveQueueNameFromMessageType receives a null messageType → must throw.
+    [ServiceBusQueue]
+    private sealed class QueueConsumerWithoutIConsumer
+    {
+    }
+
+    // [ServiceBusTopic] without IConsumer<T>:
+    // ResolveTopicNameFromMessageType receives a null messageType → must throw.
+    [ServiceBusTopic("resort-subscription")]
+    private sealed class TopicConsumerWithoutIConsumer
+    {
     }
 
     // ── GetConsumerMessageType — multi-level inheritance ──────────────────────
 
     // S1694: Intentionally abstract-only — exists purely to add an inheritance level so
     // GetConsumerMessageType can be tested against a deeply nested consumer type.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S1694:An abstract class should have both abstract and concrete methods",
-        Justification = "Test fixture: sole purpose is adding an inheritance level for GetConsumerMessageType resolution tests.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell",
+        "S1694:An abstract class should have both abstract and concrete methods",
+        Justification =
+            "Test fixture: sole purpose is adding an inheritance level for GetConsumerMessageType resolution tests.")]
     private abstract class GenericConsumerBase<T> : IConsumer<T> where T : class, IIntegrationEvent
     {
         public abstract Task Consume(IConsumeContext<T> context);

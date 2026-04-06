@@ -23,7 +23,7 @@
             <MudCardHeader>
                 <CardHeaderAvatar>
                     <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
-                        <MudIcon Icon="@Icons.Material.Filled.Hub"/>
+                        <MudIcon Icon="@Icons.Material.Filled.Hub" />
                     </MudAvatar>
                 </CardHeaderAvatar>
                 <CardHeaderContent>
@@ -36,7 +36,7 @@
 
             <MudCardContent>
                 <EditForm Model="_connForm" OnValidSubmit="SaveConnectionSettingsAsync">
-                    <DataAnnotationsValidator/>
+                    <DataAnnotationsValidator />
 
                     <MudStack Spacing="4">
                         <MudTextField @bind-Value="_connForm.AdministrationConnectionString"
@@ -49,7 +49,7 @@
                                       RequiredError="Administration connection string is required."
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
-                                      AdornmentColor="Color.Primary"/>
+                                      AdornmentColor="Color.Primary" />
 
                         <MudTextField @bind-Value="_connForm.ClientConnectionString"
                                       Label="Client Connection String"
@@ -61,7 +61,7 @@
                                       RequiredError="Client connection string is required."
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.Cable"
-                                      AdornmentColor="Color.Secondary"/>
+                                      AdornmentColor="Color.Secondary" />
 
                         <MudButton ButtonType="ButtonType.Submit"
                                    Variant="Variant.Filled"
@@ -82,7 +82,7 @@
             <MudCardHeader>
                 <CardHeaderAvatar>
                     <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
-                        <MudIcon Icon="@Icons.Material.Filled.Palette"/>
+                        <MudIcon Icon="@Icons.Material.Filled.Palette" />
                     </MudAvatar>
                 </CardHeaderAvatar>
                 <CardHeaderContent>
@@ -102,22 +102,24 @@
                                 Toggle between dark and light theme.
                             </MudText>
                         </MudStack>
-                        <MudTooltip Text="@(SettingsService.App.IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+                        <MudTooltip
+                            Text="@(SettingsService.App.IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
                             <MudToggleIconButton Toggled="@SettingsService.App.IsDarkMode"
                                                  ToggledChanged="ToggleDarkModeAsync"
                                                  Icon="@Icons.Material.Filled.LightMode"
                                                  ToggledIcon="@Icons.Material.Filled.DarkMode"
                                                  Color="Color.Default"
                                                  ToggledColor="Color.Primary"
-                                                 Size="Size.Large"/>
+                                                 Size="Size.Large" />
                         </MudTooltip>
                     </MudStack>
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@(SettingsService.App.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode)"
-                                 Color="@(SettingsService.App.IsDarkMode ? Color.Primary : Color.Warning)"/>
+                        <MudIcon
+                            Icon="@(SettingsService.App.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode)"
+                            Color="@(SettingsService.App.IsDarkMode ? Color.Primary : Color.Warning)" />
                         <MudText Typo="Typo.body2" Color="Color.Secondary">
                             Currently using <strong>@(SettingsService.App.IsDarkMode ? "Dark" : "Light")</strong> mode
                         </MudText>
@@ -169,6 +171,7 @@
     {
         await SettingsService.SaveAppSettingsAsync(new AppSettings { IsDarkMode = isDark });
     }
+
 }
 
 

@@ -62,4 +62,3 @@ public sealed class ServiceBusQueueAttribute : Attribute
     /// </summary>
     public int MaxDeliveryCount { get; init; } = 5;
 }
-

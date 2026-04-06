@@ -5,7 +5,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Send" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Send" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Send Message</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@QueueName</MudChip>
         </MudStack>
@@ -30,7 +30,7 @@
                               Disabled="_sending"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Tag"
-                              HelperText="This queue requires sessions. Every message must carry a Session ID."/>
+                              HelperText="This queue requires sessions. Every message must carry a Session ID." />
             }
             <MudTextField T="string"
                           Value="@_jsonInput"
@@ -45,14 +45,15 @@
                           Style="font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:0.875rem;"
                           Error="_validationError is not null"
                           ErrorText="@_validationError"
-                          Disabled="_sending"/>
+                          Disabled="_sending" />
             @if (_formattedPreview is not null && _validationError is null)
             {
                 <MudStack Spacing="1">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Preview (formatted)</MudText>
                     <MudPaper Class="pa-3" Elevation="0"
                               Style="background: var(--mud-palette-surface); border-radius: 6px; overflow: auto; max-height: 260px; border: 1px solid var(--mud-palette-divider);">
-                        <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color: var(--mud-palette-text-primary);">@_formattedPreview</pre>
+                        <pre
+                            style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color: var(--mud-palette-text-primary);">@_formattedPreview</pre>
                     </MudPaper>
                 </MudStack>
             }
@@ -68,7 +69,7 @@
                    ButtonType="ButtonType.Button">
             @if (_sending)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Sending&#x2026;</span>
             }
             else
@@ -78,11 +79,15 @@
         </MudButton>
     </DialogActions>
 </MudDialog>
+
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public string QueueName { get; set; } = string.Empty;
+
     /// <summary>When true a Session ID field is shown and must be filled before sending.</summary>
-    [Parameter] public bool RequiresSession { get; set; }
+    [Parameter]
+    public bool RequiresSession { get; set; }
+
     private string? _jsonInput;
     private string? _formattedPreview;
     private string? _validationError;
@@ -93,11 +98,13 @@
         !string.IsNullOrWhiteSpace(_jsonInput) &&
         _validationError is null &&
         (!RequiresSession || !string.IsNullOrWhiteSpace(_sessionId));
+
     private void OnJsonChanged(string? value)
     {
         _jsonInput = string.IsNullOrEmpty(value) ? null : value;
         ValidateJson();
     }
+
     private void ValidateJson()
     {
         _formattedPreview = null;
@@ -115,6 +122,7 @@
             _validationError = $"Invalid JSON: {ex.Message}";
         }
     }
+
     private async Task SendAsync()
     {
         ValidateJson();
@@ -136,5 +144,6 @@
             _sending = false;
         }
     }
+
     private void Cancel() => MudDialog.Cancel();
 }

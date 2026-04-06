@@ -2,7 +2,6 @@
 @using Azure.Messaging.ServiceBus
 @using BusWorks.Viewer.Models
 @using BusWorks.Viewer.Services
-@using BusWorks.Viewer.Components.Shared
 @inject QueueService QueueService
 @inject ISnackbar Snackbar
 
@@ -10,13 +9,13 @@
 
 @* ── Breadcrumb + actions ── *@
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0"/>
-    <MudSpacer/>
+    <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0" />
+    <MudSpacer />
     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                    Color="Color.Primary"
                    OnClick="LoadAllAsync"
                    Disabled="_loadingDetail"
-                   title="Refresh"/>
+                   title="Refresh" />
     <MudButton Variant="Variant.Outlined"
                StartIcon="@Icons.Material.Filled.ArrowBack"
                Href="/queues/overview">
@@ -26,14 +25,15 @@
 
 @if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="() => _error = null">
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4" ShowCloseIcon="true"
+              CloseIconClicked="() => _error = null">
         @_error
     </MudAlert>
 }
 
 @if (_loadingDetail)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
 }
 
 @if (_detail is not null)
@@ -41,9 +41,9 @@
     @* ── Queue Settings Panel ── *@
     <MudPaper Class="pa-5 mb-6" Elevation="2">
         <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-            <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" />
             <MudText Typo="Typo.h5">@_detail.Name</MudText>
-            <MudSpacer/>
+            <MudSpacer />
             <MudChip T="string"
                      Color="@(_detail.Status == "Active" ? Color.Success : Color.Warning)"
                      Variant="Variant.Filled"
@@ -81,7 +81,7 @@
         </MudGrid>
 
         @* ── Inline message counters ── *@
-        <MudDivider Class="my-4"/>
+        <MudDivider Class="my-4" />
         <MudStack Row="true" Spacing="6">
             <MudStack Spacing="0">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
@@ -89,7 +89,8 @@
             </MudStack>
             <MudStack Spacing="0">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
-                <MudText Typo="Typo.h6" Color="@(_detail.DeadLetterMessages > 0 ? Color.Error : Color.Default)">@FormatCount(_detail.DeadLetterMessages)</MudText>
+                <MudText Typo="Typo.h6"
+                         Color="@(_detail.DeadLetterMessages > 0 ? Color.Error : Color.Default)">@FormatCount(_detail.DeadLetterMessages)</MudText>
             </MudStack>
             <MudStack Spacing="0">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Total</MudText>
@@ -103,74 +104,74 @@
         <MudTabPanel Text="@($"Active ({FormatCount(_detail.ActiveMessages)})")"
                      Icon="@Icons.Material.Filled.Inbox">
             <div class="pa-4">
-            @if (_loadingActive)
-            {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
-            }
-            else if (_activeMessages.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Class="my-2">
-                    No active messages in this queue.
-                </MudAlert>
-            }
-            else
-            {
-                <MudStack Spacing="0">
-                    @foreach (ServiceBusReceivedMessage msg in _activeMessages)
-                    {
-                        <MessageCard Message="msg" IsDeadLetter="false"/>
-                    }
-                </MudStack>
-                @if (_activeMessages.Count >= PageSize)
+                @if (_loadingActive)
                 {
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.ExpandMore"
-                               OnClick="LoadMoreActiveAsync"
-                               Disabled="_loadingActive"
-                               FullWidth="true"
-                               Class="mt-2">
-                        Load more
-                    </MudButton>
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
                 }
-            }
+                else if (_activeMessages.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Text" Class="my-2">
+                        No active messages in this queue.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="0">
+                        @foreach (ServiceBusReceivedMessage msg in _activeMessages)
+                        {
+                            <MessageCard Message="msg" IsDeadLetter="false" />
+                        }
+                    </MudStack>
+                    @if (_activeMessages.Count >= PageSize)
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.ExpandMore"
+                                   OnClick="LoadMoreActiveAsync"
+                                   Disabled="_loadingActive"
+                                   FullWidth="true"
+                                   Class="mt-2">
+                            Load more
+                        </MudButton>
+                    }
+                }
             </div>
         </MudTabPanel>
 
         <MudTabPanel Text="@($"Dead-letter ({FormatCount(_detail.DeadLetterMessages)})")"
                      Icon="@Icons.Material.Filled.ErrorOutline">
             <div class="pa-4">
-            @if (_loadingDeadLetter)
-            {
-                <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4"/>
-            }
-            else if (_deadLetterMessages.Count == 0)
-            {
-                <MudAlert Severity="Severity.Success" Variant="Variant.Text" Class="my-2">
-                    No dead-letter messages — looking good!
-                </MudAlert>
-            }
-            else
-            {
-                <MudStack Spacing="0">
-                    @foreach (ServiceBusReceivedMessage msg in _deadLetterMessages)
-                    {
-                        <MessageCard Message="msg" IsDeadLetter="true"/>
-                    }
-                </MudStack>
-                @if (_deadLetterMessages.Count >= PageSize)
+                @if (_loadingDeadLetter)
                 {
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Error"
-                               StartIcon="@Icons.Material.Filled.ExpandMore"
-                               OnClick="LoadMoreDeadLetterAsync"
-                               Disabled="_loadingDeadLetter"
-                               FullWidth="true"
-                               Class="mt-2">
-                        Load more
-                    </MudButton>
+                    <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4" />
                 }
-            }
+                else if (_deadLetterMessages.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Success" Variant="Variant.Text" Class="my-2">
+                        No dead-letter messages — looking good!
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="0">
+                        @foreach (ServiceBusReceivedMessage msg in _deadLetterMessages)
+                        {
+                            <MessageCard Message="msg" IsDeadLetter="true" />
+                        }
+                    </MudStack>
+                    @if (_deadLetterMessages.Count >= PageSize)
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.ExpandMore"
+                                   OnClick="LoadMoreDeadLetterAsync"
+                                   Disabled="_loadingDeadLetter"
+                                   FullWidth="true"
+                                   Class="mt-2">
+                            Load more
+                        </MudButton>
+                    }
+                }
             </div>
         </MudTabPanel>
     </MudTabs>
@@ -296,6 +297,7 @@
             return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
         return $"{ts.TotalSeconds}s";
     }
+
 }
 
 

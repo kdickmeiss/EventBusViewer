@@ -1,8 +1,12 @@
-﻿# BusWorks Guide
+﻿# BusWorks
+
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
+![NuGet](https://img.shields.io/nuget/v/BusWorks?logo=nuget)
+![Azure Service Bus](https://img.shields.io/badge/Azure-Service%20Bus-0078D4?logo=microsoftazure)
 
 Comprehensive guide for publishing and consuming messages using BusWorks — a processor for Azure Service Bus messages that hosts a background service for message consumption and publishing, and is extensible for other brokers.
 
-## 📚 Table of Contents
+## 📚 Table of contents
 
 1. [Architecture Overview](#-architecture-overview)
 2. [Publishing Messages](#-publishing-messages)
@@ -1300,13 +1304,16 @@ Fix: ensure both sides agree — `ISessionedEvent` on the event **and** `Require
 - **Route helper:** `BusWorks.Abstractions/ServiceBusRoute.cs`
 - **Session interface:** `BusWorks.Abstractions/ISessionedEvent.cs`
 - **Azure Service Bus Docs:** [Microsoft Learn](https://learn.microsoft.com/azure/service-bus-messaging/)
-- **Azure Service Bus Sessions:** [Session documentation](https://learn.microsoft.com/azure/service-bus-messaging/message-sessions)
-- **OpenTelemetry Messaging Conventions:** [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/messaging/)
+- **[OpenTelemetry Messaging Conventions](https://opentelemetry.io/docs/specs/semconv/messaging/)** — Semantic Conventions
 
 ---
 
-**Last Updated:** March 31, 2026  
-**Key files:** `IConsumer.cs`, `MessageContext.cs`, `IEventBusPublisher.cs`, `ServiceBusRouteAttributes.cs`, `ServiceBusRoute.cs`, `IntegrationEvent.cs`, `ISessionedEvent.cs`, `ServiceBusProcessorBackgroundService.cs`
+## 🔗 Related packages
+
+- **[BusWorks.Abstractions](https://www.nuget.org/packages/BusWorks.Abstractions)** — Framework contracts (zero Azure SDK dependency)  
+  → [Documentation](../BusWorks.Abstractions/README.md)
+- **[BusWorks.Viewer](../../viewers/BusWorks.Viewer/README.md)** — Browser-based management UI for queues, topics, and subscriptions
+
 
 
 

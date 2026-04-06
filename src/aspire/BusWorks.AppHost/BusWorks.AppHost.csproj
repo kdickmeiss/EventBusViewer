@@ -13,7 +13,6 @@
     <ItemGroup>
       <ProjectReference Include="..\..\examples\BusWorks.Examples.Receiver\BusWorks.Examples.Receiver.csproj" />
       <ProjectReference Include="..\..\examples\BusWorks.Examples.Sender\BusWorks.Examples.Sender.csproj" />
-      <ProjectReference Include="..\..\viewers\BusWorks.Viewer.Console\BusWorks.Viewer.Console.csproj" />
       <ProjectReference Include="..\..\viewers\BusWorks.Viewer\BusWorks.Viewer.csproj" />
     </ItemGroup>
 

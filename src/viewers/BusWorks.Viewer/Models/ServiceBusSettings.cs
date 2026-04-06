@@ -7,4 +7,3 @@ public sealed class ServiceBusSettings
     public string AdministrationConnectionString { get; set; } = string.Empty;
     public string ClientConnectionString { get; set; } = string.Empty;
 }
-

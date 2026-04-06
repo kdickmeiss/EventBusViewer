@@ -42,4 +42,3 @@ public interface ISessionedEvent : IIntegrationEvent
     /// </summary>
     string SessionId { get; }
 }
-

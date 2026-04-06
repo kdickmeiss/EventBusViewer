@@ -8,43 +8,33 @@ namespace BusWorks.Viewer.Services;
 /// Reads from IConfiguration (appsettings.json + user-settings.json) on startup.
 /// Persists user changes to user-settings.json in the content root.
 /// </summary>
-public sealed class SettingsService
+public sealed class SettingsService(IConfiguration configuration, IWebHostEnvironment environment)
 {
-    private readonly string _userSettingsPath;
-    private ServiceBusSettings _serviceBus;
-    private AppSettings _app;
+    private readonly string _userSettingsPath = Path.Combine(environment.ContentRootPath, "user-settings.json");
 
     /// <summary>Raised on the calling thread whenever settings are saved.</summary>
     public event Action? OnChange;
 
-    public ServiceBusSettings ServiceBus => _serviceBus;
-    public AppSettings App => _app;
+    public ServiceBusSettings ServiceBus { get; private set; } = configuration.GetSection(ServiceBusSettings.SectionName)
+        .Get<ServiceBusSettings>() ?? new ServiceBusSettings();
+
+    public AppSettings App { get; private set; } = configuration.GetSection(AppSettings.SectionName)
+        .Get<AppSettings>() ?? new AppSettings();
 
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(_serviceBus.AdministrationConnectionString) &&
-        !string.IsNullOrWhiteSpace(_serviceBus.ClientConnectionString);
-
-    public SettingsService(IConfiguration configuration, IWebHostEnvironment environment)
-    {
-        _userSettingsPath = Path.Combine(environment.ContentRootPath, "user-settings.json");
-
-        _serviceBus = configuration.GetSection(ServiceBusSettings.SectionName)
-                          .Get<ServiceBusSettings>() ?? new ServiceBusSettings();
-
-        _app = configuration.GetSection(AppSettings.SectionName)
-                   .Get<AppSettings>() ?? new AppSettings();
-    }
+        !string.IsNullOrWhiteSpace(ServiceBus.AdministrationConnectionString) &&
+        !string.IsNullOrWhiteSpace(ServiceBus.ClientConnectionString);
 
     public async Task SaveConnectionSettingsAsync(ServiceBusSettings settings)
     {
-        _serviceBus = settings;
+        ServiceBus = settings;
         await PersistAsync();
         OnChange?.Invoke();
     }
 
     public async Task SaveAppSettingsAsync(AppSettings settings)
     {
-        _app = settings;
+        App = settings;
         await PersistAsync();
         OnChange?.Invoke();
     }
@@ -55,12 +45,11 @@ public sealed class SettingsService
     {
         var root = new Dictionary<string, object>
         {
-            [ServiceBusSettings.SectionName] = _serviceBus,
-            [AppSettings.SectionName] = _app
+            [ServiceBusSettings.SectionName] = ServiceBus,
+            [AppSettings.SectionName] = App
         };
 
         string json = JsonSerializer.Serialize(root, JsonOptions);
         await File.WriteAllTextAsync(_userSettingsPath, json);
     }
 }
-

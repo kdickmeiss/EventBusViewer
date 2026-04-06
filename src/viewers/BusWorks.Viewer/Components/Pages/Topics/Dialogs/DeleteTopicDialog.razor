@@ -1,28 +1,29 @@
-﻿@using BusWorks.Viewer.Services
-@inject QueueService QueueService
+@using BusWorks.Viewer.Services
+@inject TopicService TopicService
 @inject ISnackbar Snackbar
 
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error"/>
-            <MudText Typo="Typo.h6">Delete Queue</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Delete Topic</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
         @if (_deleting)
         {
-            <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4" />
         }
 
         <MudStack Spacing="3">
             <MudText Typo="Typo.body1">
-                Are you sure you want to delete the queue
-                <strong>@QueueName</strong>?
+                Are you sure you want to delete the topic
+                <strong>@TopicName</strong>?
             </MudText>
 
             <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
-                This action is <strong>irreversible</strong>. The queue and all its messages will be permanently deleted.
+                This action is <strong>irreversible</strong>. The topic, all its subscriptions, and all their messages
+                will be permanently deleted.
             </MudAlert>
         </MudStack>
     </DialogContent>
@@ -40,7 +41,7 @@
                    Disabled="_deleting">
             @if (_deleting)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Deleting…</span>
             }
             else
@@ -54,7 +55,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
-    [Parameter, EditorRequired] public string QueueName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string TopicName { get; set; } = string.Empty;
 
     private bool _deleting;
 
@@ -63,13 +64,13 @@
         _deleting = true;
         try
         {
-            await QueueService.DeleteQueueAsync(QueueName);
-            Snackbar.Add($"Queue \"{QueueName}\" deleted.", Severity.Success);
+            await TopicService.DeleteTopicAsync(TopicName);
+            Snackbar.Add($"Topic \"{TopicName}\" deleted.", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to delete queue: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Failed to delete topic: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -79,3 +80,4 @@
 
     private void Cancel() => MudDialog.Cancel();
 }
+

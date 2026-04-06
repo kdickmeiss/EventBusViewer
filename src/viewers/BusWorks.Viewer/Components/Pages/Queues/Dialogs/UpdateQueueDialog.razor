@@ -6,7 +6,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Edit Queue</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@QueueName</MudChip>
         </MudStack>
@@ -14,7 +14,7 @@
     <DialogContent>
         @if (_loading || _saving)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
         }
 
         @if (_loadError is not null)
@@ -37,7 +37,7 @@
                                   Disabled="_saving"
                                   Error="@(_nameError is not null)"
                                   ErrorText="@_nameError"
-                                  OnBlur="@(_ => _nameError = null)"/>
+                                  OnBlur="@(_ => _nameError = null)" />
 
                     @* ── Rename warning ── *@
                     @if (IsRename)
@@ -48,10 +48,12 @@
                         </MudAlert>
                     }
 
-                    @* ── Editable settings ── *@
+                    <MudDivider />
+
+                    @* ── Status ── *@
                     <MudSelect T="EntityStatus"
                                Value="_status"
-                               ValueChanged="@((EntityStatus v) => _status = v)"
+                               ValueChanged="@(v => _status = v)"
                                Label="Status"
                                Variant="Variant.Outlined"
                                Disabled="_saving"
@@ -62,6 +64,9 @@
                         <MudSelectItem Value="EntityStatus.ReceiveDisabled">Receive Disabled</MudSelectItem>
                     </MudSelect>
 
+                    <MudDivider />
+
+                    @* ── Delivery & locking ── *@
                     <MudNumericField T="int"
                                      @bind-Value="_maxDeliveryCount"
                                      Label="Max Delivery Count"
@@ -69,7 +74,7 @@
                                      Min="1"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How many times delivery is attempted before the message is dead-lettered."/>
+                                     HelperText="How many times delivery is attempted before the message is dead-lettered." />
 
                     <MudNumericField T="int"
                                      @bind-Value="_lockDurationSeconds"
@@ -79,13 +84,67 @@
                                      Max="300"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How long a received message stays locked (1 – 300 s)."/>
+                                     HelperText="How long a received message stays locked (1 – 300 s)." />
 
+                    <MudDivider />
+
+                    @* ── Default Message TTL ── *@
+                    @if (_ttlIsMax)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-0">
+                            The current TTL is set to <strong>never expire</strong> (TimeSpan.MaxValue).
+                            Enter a value in seconds below to override it.
+                        </MudAlert>
+                    }
+                    <MudNumericField T="long"
+                                     @bind-Value="_defaultMessageTtlSeconds"
+                                     Label="Default Message TTL (seconds)"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Required="true"
+                                     Disabled="_saving"
+                                     HelperText="How long a message is retained if not consumed. E.g. 3 600 = 1 h · 86 400 = 1 day · 604 800 = 1 week." />
+
+                    <MudDivider />
+
+                    @* ── Toggles ── *@
                     <MudSwitch T="bool"
                                @bind-Value="_deadLetterOnExpiry"
                                Label="Dead-letter on Message Expiry"
                                Color="Color.Primary"
-                               Disabled="_saving"/>
+                               Disabled="_saving" />
+
+                    <MudSwitch T="bool"
+                               @bind-Value="_enableBatchedOperations"
+                               Label="Enable Batched Operations"
+                               Color="Color.Primary"
+                               Disabled="_saving" />
+
+                    @* ── Read-only info ── *@
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Read-only properties</MudText>
+                    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.Storage"
+                                 Color="Color.Default">
+                            Max Size: @_props.MaxSizeInMegabytes MB
+                        </MudChip>
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.AccountTree"
+                                 Color="@(_props.RequiresSession ? Color.Tertiary : Color.Default)">
+                            Sessions: @(_props.RequiresSession ? "Required" : "Not required")
+                        </MudChip>
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.ViewStream"
+                                 Color="@(_props.EnablePartitioning ? Color.Info : Color.Default)">
+                            Partitioning: @(_props.EnablePartitioning ? "Enabled" : "Disabled")
+                        </MudChip>
+                        <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
+                                 Icon="@Icons.Material.Filled.FindReplace"
+                                 Color="@(_props.RequiresDuplicateDetection ? Color.Info : Color.Default)">
+                            Duplicate Detection: @(_props.RequiresDuplicateDetection ? "Enabled" : "Disabled")
+                        </MudChip>
+                    </MudStack>
 
                 </MudStack>
             </MudForm>
@@ -105,7 +164,7 @@
                    Disabled="@(_loading || _saving || !_formValid || _loadError is not null)">
             @if (_saving)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>@(IsRename ? "Renaming…" : "Saving…")</span>
             }
             else
@@ -134,8 +193,13 @@
     private int _maxDeliveryCount;
     private int _lockDurationSeconds;
     private bool _deadLetterOnExpiry;
+    private bool _enableBatchedOperations;
+    private long _defaultMessageTtlSeconds;
 
     private EntityStatus _status;
+
+    /// <summary>True when the queue's TTL was TimeSpan.MaxValue (never expire).</summary>
+    private bool _ttlIsMax;
 
     private bool IsRename => !string.IsNullOrWhiteSpace(_name)
                              && _name.Trim() != QueueName;
@@ -146,11 +210,17 @@
         try
         {
             _props = await QueueService.GetQueuePropertiesAsync(QueueName);
-            _name                = _props.Name;
-            _maxDeliveryCount    = _props.MaxDeliveryCount;
+            _name = _props.Name;
+            _maxDeliveryCount = _props.MaxDeliveryCount;
             _lockDurationSeconds = (int)_props.LockDuration.TotalSeconds;
-            _deadLetterOnExpiry  = _props.DeadLetteringOnMessageExpiration;
-            _status              = _props.Status;
+            _deadLetterOnExpiry = _props.DeadLetteringOnMessageExpiration;
+            _enableBatchedOperations = _props.EnableBatchedOperations;
+            _status = _props.Status;
+
+            _ttlIsMax = _props.DefaultMessageTimeToLive == TimeSpan.MaxValue;
+            _defaultMessageTtlSeconds = _ttlIsMax
+                ? 3_600 // sensible default shown when overriding a "never-expire" TTL
+                : (long)_props.DefaultMessageTimeToLive.TotalSeconds;
         }
         catch (Exception ex)
         {
@@ -171,10 +241,12 @@
             if (!_formValid) return;
 
             // Apply editable settings to the live properties object
-            _props!.MaxDeliveryCount                = _maxDeliveryCount;
-            _props.LockDuration                     = TimeSpan.FromSeconds(_lockDurationSeconds);
+            _props!.MaxDeliveryCount = _maxDeliveryCount;
+            _props.LockDuration = TimeSpan.FromSeconds(_lockDurationSeconds);
             _props.DeadLetteringOnMessageExpiration = _deadLetterOnExpiry;
-            _props.Status                           = _status;
+            _props.EnableBatchedOperations = _enableBatchedOperations;
+            _props.DefaultMessageTimeToLive = TimeSpan.FromSeconds(_defaultMessageTtlSeconds);
+            _props.Status = _status;
 
             if (IsRename)
             {

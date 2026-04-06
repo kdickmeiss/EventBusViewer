@@ -56,4 +56,3 @@ public sealed class MessageContext
     public IReadOnlyDictionary<string, object> ApplicationProperties { get; init; }
         = new Dictionary<string, object>();
 }
-

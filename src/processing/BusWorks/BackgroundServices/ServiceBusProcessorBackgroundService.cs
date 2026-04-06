@@ -21,7 +21,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
     private readonly ServiceBusTelemetry _telemetry = new(tracer, logger);
     private readonly List<ServiceBusProcessor> _serviceBusProcessors = [];
     private readonly List<ServiceBusSessionProcessor> _serviceBusSessionProcessors = [];
-    
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await WaitForApplicationStartup();
@@ -50,7 +50,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
             return;
 
         var tcs = new TaskCompletionSource();
-        await using CancellationTokenRegistration reg = hostApplicationLifetime.ApplicationStarted.Register(() => tcs.SetResult());
+        await using CancellationTokenRegistration reg =
+            hostApplicationLifetime.ApplicationStarted.Register(() => tcs.SetResult());
         await tcs.Task;
     }
 
@@ -76,8 +77,10 @@ internal sealed class ServiceBusProcessorBackgroundService(
             if (endpoint.RequireSession)
             {
                 ServiceBusSessionProcessor sessionProcessor = CreateSessionProcessor(endpoint);
-                ConfigureSessionMessageHandler(sessionProcessor, consumerName, processorFactory, endpoint, endpointDescription);
-                sessionProcessor.ProcessErrorAsync += _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Session:Error");
+                ConfigureSessionMessageHandler(sessionProcessor, consumerName, processorFactory, endpoint,
+                    endpointDescription);
+                sessionProcessor.ProcessErrorAsync +=
+                    _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Session:Error");
                 await sessionProcessor.StartProcessingAsync(stoppingToken);
                 _serviceBusSessionProcessors.Add(sessionProcessor);
             }
@@ -85,7 +88,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
             {
                 ServiceBusProcessor processor = CreateProcessor(endpoint);
                 ConfigureMessageHandler(processor, consumerName, processorFactory, endpoint, endpointDescription);
-                processor.ProcessErrorAsync += _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Error");
+                processor.ProcessErrorAsync +=
+                    _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Error");
                 await processor.StartProcessingAsync(stoppingToken);
                 _serviceBusProcessors.Add(processor);
             }
@@ -127,7 +131,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
             MaxConcurrentSessions = _worksOptions.MaxConcurrentSessions,
             MaxConcurrentCallsPerSession = _worksOptions.MaxConcurrentCallsPerSession,
             AutoCompleteMessages = false,
-            MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5)
+            MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5),
+            SessionIdleTimeout = _worksOptions.SessionIdleTimeout
         };
 
         return endpoint.IsQueue
@@ -170,7 +175,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
                     await args.DeadLetterMessageAsync(
                         args.Message,
                         deadLetterReason: "MaxDeliveryCountExceeded",
-                        deadLetterErrorDescription: $"Message exceeded the maximum delivery count of {endpoint.MaxDeliveryCount}. Last error: {ex.Message}",
+                        deadLetterErrorDescription:
+                        $"Message exceeded the maximum delivery count of {endpoint.MaxDeliveryCount}. Last error: {ex.Message}",
                         cancellationToken: args.CancellationToken);
                 }
                 else
@@ -226,7 +232,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
                     await args.DeadLetterMessageAsync(
                         args.Message,
                         deadLetterReason: "MaxDeliveryCountExceeded",
-                        deadLetterErrorDescription: $"Message exceeded the maximum delivery count of {endpoint.MaxDeliveryCount}. Last error: {ex.Message}",
+                        deadLetterErrorDescription:
+                        $"Message exceeded the maximum delivery count of {endpoint.MaxDeliveryCount}. Last error: {ex.Message}",
                         cancellationToken: args.CancellationToken);
                 }
                 else
@@ -244,16 +251,26 @@ internal sealed class ServiceBusProcessorBackgroundService(
 
         foreach (ServiceBusProcessor processor in _serviceBusProcessors)
         {
-            try { await processor.StopProcessingAsync(cancellationToken); await processor.DisposeAsync(); }
+            try
+            {
+                await processor.StopProcessingAsync(cancellationToken);
+                await processor.DisposeAsync();
+            }
             catch (Exception ex) { logger.LogError(ex, "Error stopping ServiceBusProcessor"); }
         }
+
         _serviceBusProcessors.Clear();
 
         foreach (ServiceBusSessionProcessor processor in _serviceBusSessionProcessors)
         {
-            try { await processor.StopProcessingAsync(cancellationToken); await processor.DisposeAsync(); }
+            try
+            {
+                await processor.StopProcessingAsync(cancellationToken);
+                await processor.DisposeAsync();
+            }
             catch (Exception ex) { logger.LogError(ex, "Error stopping ServiceBusSessionProcessor"); }
         }
+
         _serviceBusSessionProcessors.Clear();
     }
 }

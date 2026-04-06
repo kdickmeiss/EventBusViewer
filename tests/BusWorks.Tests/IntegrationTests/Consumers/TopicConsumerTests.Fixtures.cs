@@ -3,10 +3,11 @@ using BusWorks.Abstractions.Attributes;
 using BusWorks.Abstractions.Consumer;
 using BusWorks.Abstractions.Events;
 using BusWorks.Consumer;
+using BusWorks.Tests.IntegrationTests.BuildingBlocks;
 
 namespace BusWorks.Tests.IntegrationTests.Consumers;
 
-internal sealed partial class TopicConsumerTests
+public sealed partial class TopicConsumerTests
 {
     /// <summary>
     /// Represents a parking-spot status change broadcast to all interested services.
@@ -18,28 +19,28 @@ internal sealed partial class TopicConsumerTests
     /// references it for consumer setup.
     /// </summary>
     [TopicRoute(TopicName)]
-    internal sealed record ParkingSpotStatusChangedEvent(
+    public sealed record ParkingSpotStatusChangedEvent(
         Guid Id,
         DateTime OccurredOnUtc,
         string SpotCode,
         string Status,
         string ParkingLotId) : IntegrationEvent(Id, OccurredOnUtc);
-    
+
     /// <summary>
-    /// Test-only consumer that signals a <see cref="TaskCompletionSource{T}"/> once the
-    /// deserialized message has been processed.
-    /// Instantiated directly by test helpers — not via the DI container or the background service.
+    /// Test consumer that writes every processed event into a <see cref="TestConsumerCapture{T}"/>
+    /// so tests can <c>await</c> the captured result without a per-invocation
+    /// <see cref="System.Threading.Tasks.TaskCompletionSource{T}"/>.
     /// </summary>
+    /// <remarks>
+    /// Resolved from the DI container via <c>ServiceBusMessageProcessorBuilder.Build()</c>
+    /// — the same factory the <c>ServiceBusProcessorBackgroundService</c> uses in production.
+    /// </remarks>
     [ServiceBusTopic(SubscriptionName)]
     internal sealed class CapturingParkingSpotConsumer(
-        TaskCompletionSource<ParkingSpotStatusChangedEvent> completion)
+        TestConsumerCapture<ParkingSpotStatusChangedEvent> capture)
         : IConsumer<ParkingSpotStatusChangedEvent>
     {
         public Task Consume(IConsumeContext<ParkingSpotStatusChangedEvent> context)
-        {
-            completion.TrySetResult(context.Message);
-            return Task.CompletedTask;
-        }
+            => capture.WriteAsync(context.Message, context.Metadata, context.CancellationToken).AsTask();
     }
 }
-

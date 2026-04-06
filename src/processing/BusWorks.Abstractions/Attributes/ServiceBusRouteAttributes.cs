@@ -41,4 +41,3 @@ public sealed class TopicRouteAttribute(string topicName) : Attribute
     /// <summary>The Service Bus topic name.</summary>
     public string TopicName { get; } = topicName;
 }
-

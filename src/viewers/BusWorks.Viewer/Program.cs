@@ -45,18 +45,11 @@ app.MapRazorComponents<App>()
 if (!app.Environment.IsDevelopment())
 {
     string url = "http://localhost:5000"; // Change this if you configure a different port
-    try
+    Process.Start(new ProcessStartInfo
     {
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = url,
-            UseShellExecute = true
-        });
-    }
-    catch (Exception ex)
-    {
-        // Optionally log or handle the error
-    }
+        FileName = url,
+        UseShellExecute = true
+    });
 }
 
 await app.RunAsync();

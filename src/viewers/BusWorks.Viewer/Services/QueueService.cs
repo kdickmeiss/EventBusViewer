@@ -11,7 +11,7 @@ public sealed class QueueService
     public QueueService(ServiceBusClientProvider clients) => _clients = clients;
 
     private ServiceBusAdministrationClient AdminClient => _clients.AdminClient;
-    private ServiceBusClient               BusClient   => _clients.BusClient;
+    private ServiceBusClient BusClient => _clients.BusClient;
 
 
     /// <summary>

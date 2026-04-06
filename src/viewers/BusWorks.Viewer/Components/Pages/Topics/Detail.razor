@@ -43,9 +43,9 @@
     @* ── Topic Properties Panel ── *@
     <MudPaper Class="pa-5 mb-6" Elevation="2">
         <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-            <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary" />
             <MudText Typo="Typo.h5">@_detail.Name</MudText>
-            <MudSpacer/>
+            <MudSpacer />
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Send"
@@ -230,7 +230,7 @@
                                        Size="Size.Small"
                                        Color="Color.Primary"
                                        title="Edit subscription"
-                                       OnClick="@(() => OpenEditSubscriptionDialogAsync(context.Name))"/>
+                                       OnClick="@(() => OpenEditSubscriptionDialogAsync(context.Name))" />
                     </MudTooltip>
                 </MudTd>
                 <MudTd Style="text-align:right">
@@ -530,10 +530,10 @@
 
         var options = new DialogOptions
         {
-            MaxWidth         = MaxWidth.Medium,
-            FullWidth        = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
             CloseOnEscapeKey = true,
-            CloseButton      = true
+            CloseButton = true
         };
 
         IDialogReference dialog = await DialogService.ShowAsync<SendTopicMessageDialog>(
@@ -548,16 +548,16 @@
     {
         var parameters = new DialogParameters<UpdateSubscriptionDialog>
         {
-            { x => x.TopicName,        TopicName        },
+            { x => x.TopicName, TopicName },
             { x => x.SubscriptionName, subscriptionName }
         };
 
         var options = new DialogOptions
         {
-            MaxWidth         = MaxWidth.Small,
-            FullWidth        = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
             CloseOnEscapeKey = true,
-            CloseButton      = true
+            CloseButton = true
         };
 
         IDialogReference dialog =

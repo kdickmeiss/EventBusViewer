@@ -142,8 +142,7 @@ public abstract class ConsumerTestBase<TEvent> : TestBase
         {
             batch = await dlqReceiver.ReceiveMessagesAsync(
                 maxMessages: 100, maxWaitTime: TimeSpan.FromMilliseconds(300));
-        }
-        while (batch.Count > 0);
+        } while (batch.Count > 0);
     }
 
     // ── Shared tests ───────────────────────────────────────────────────────

@@ -98,7 +98,8 @@ public sealed class MessageContextMappingTests
     public async Task ContentType_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(contentType: "application/json"), TestContext.Current.CancellationToken);
+        await InvokeAsync(consumer, CreateMessage(contentType: "application/json"),
+            TestContext.Current.CancellationToken);
 
         consumer.CapturedMetadata!.ContentType.ShouldBe("application/json");
     }
@@ -107,7 +108,8 @@ public sealed class MessageContextMappingTests
     public async Task Subject_IsMappedFromBrokerMessage()
     {
         var consumer = new MetadataCapturingConsumer();
-        await InvokeAsync(consumer, CreateMessage(subject: "parking.reservation.created"), TestContext.Current.CancellationToken);
+        await InvokeAsync(consumer, CreateMessage(subject: "parking.reservation.created"),
+            TestContext.Current.CancellationToken);
 
         consumer.CapturedMetadata!.Subject.ShouldBe("parking.reservation.created");
     }
@@ -117,7 +119,7 @@ public sealed class MessageContextMappingTests
     {
         var props = new Dictionary<string, object>
         {
-            ["EventType"]   = "ParkingReservationCreated",
+            ["EventType"] = "ParkingReservationCreated",
             ["traceparent"] = "00-abc123-def456-01"
         };
         var consumer = new MetadataCapturingConsumer();
@@ -145,14 +147,14 @@ public sealed class MessageContextMappingTests
 
         var consumer = new MetadataCapturingConsumer();
         await InvokeAsync(consumer, CreateMessage(
-            messageId:             "full-msg",
-            sessionId:             "full-session",
-            correlationId:         "full-corr",
-            deliveryCount:         2,
-            sequenceNumber:        42L,
-            enqueuedTime:          enqueued,
-            contentType:           "application/json",
-            subject:               "full-subject",
+            messageId: "full-msg",
+            sessionId: "full-session",
+            correlationId: "full-corr",
+            deliveryCount: 2,
+            sequenceNumber: 42L,
+            enqueuedTime: enqueued,
+            contentType: "application/json",
+            subject: "full-subject",
             applicationProperties: props), TestContext.Current.CancellationToken);
 
         MessageContext md = consumer.CapturedMetadata!;
@@ -182,16 +184,16 @@ public sealed class MessageContextMappingTests
             new MetadataEvent(Guid.NewGuid(), DateTime.UtcNow));
 
         return ServiceBusModelFactory.ServiceBusReceivedMessage(
-            body:                  body,
-            messageId:             messageId,
-            sessionId:             sessionId,
-            correlationId:         correlationId,
-            deliveryCount:         deliveryCount,
-            sequenceNumber:        sequenceNumber,
-            enqueuedTime:          enqueuedTime ?? default,
-            contentType:           contentType,
-            subject:               subject,
-            properties:            applicationProperties);
+            body: body,
+            messageId: messageId,
+            sessionId: sessionId,
+            correlationId: correlationId,
+            deliveryCount: deliveryCount,
+            sequenceNumber: sequenceNumber,
+            enqueuedTime: enqueuedTime ?? default,
+            contentType: contentType,
+            subject: subject,
+            properties: applicationProperties);
     }
 
     private static Task InvokeAsync<T>(
@@ -199,8 +201,8 @@ public sealed class MessageContextMappingTests
         ServiceBusReceivedMessage message,
         CancellationToken ct = default) where T : class, IIntegrationEvent
     {
-        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor = ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
+        Func<ServiceBusReceivedMessage, CancellationToken, Task> processor =
+            ServiceBusMessageProcessorBuilder.BuildTypedProcessor(consumer);
         return processor(message, ct);
     }
 }
-

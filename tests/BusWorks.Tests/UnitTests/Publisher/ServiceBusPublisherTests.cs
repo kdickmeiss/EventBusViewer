@@ -72,4 +72,3 @@ public sealed class ServiceBusPublisherTests
         ex.Message.ShouldContain("TopicRoute");
     }
 }
-

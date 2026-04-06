@@ -4,14 +4,10 @@ using BusWorks.Viewer.Models;
 
 namespace BusWorks.Viewer.Services;
 
-public sealed class TopicService
+public sealed class TopicService(ServiceBusClientProvider clients)
 {
-    private readonly ServiceBusClientProvider _clients;
-
-    public TopicService(ServiceBusClientProvider clients) => _clients = clients;
-
-    private ServiceBusAdministrationClient AdminClient => _clients.AdminClient;
-    private ServiceBusClient               BusClient   => _clients.BusClient;
+    private ServiceBusAdministrationClient AdminClient => clients.AdminClient;
+    private ServiceBusClient BusClient => clients.BusClient;
 
     /// <summary>
     /// Returns every topic with its subscription count and aggregate active/dead-letter message counts (peek-based).
@@ -23,7 +19,8 @@ public sealed class TopicService
         await foreach (TopicProperties topic in AdminClient.GetTopicsAsync(cancellationToken))
         {
             var subscriptionNames = new List<string>();
-            await foreach (SubscriptionProperties sub in AdminClient.GetSubscriptionsAsync(topic.Name, cancellationToken))
+            await foreach (SubscriptionProperties sub in AdminClient.GetSubscriptionsAsync(topic.Name,
+                               cancellationToken))
                 subscriptionNames.Add(sub.SubscriptionName);
 
             int active = 0;
@@ -31,8 +28,10 @@ public sealed class TopicService
 
             foreach (string sub in subscriptionNames)
             {
-                active     += await CountSubscriptionMessagesAsync(topic.Name, sub, fromDeadLetter: false, cancellationToken);
-                deadLetter += await CountSubscriptionMessagesAsync(topic.Name, sub, fromDeadLetter: true,  cancellationToken);
+                active += await CountSubscriptionMessagesAsync(topic.Name, sub, fromDeadLetter: false,
+                    cancellationToken);
+                deadLetter +=
+                    await CountSubscriptionMessagesAsync(topic.Name, sub, fromDeadLetter: true, cancellationToken);
             }
 
             topics.Add(new TopicInfo(topic.Name, subscriptionNames.Count, active, deadLetter, topic.Status));
@@ -86,8 +85,10 @@ public sealed class TopicService
 
         await foreach (SubscriptionProperties sub in AdminClient.GetSubscriptionsAsync(topicName, cancellationToken))
         {
-            int active     = await CountSubscriptionMessagesAsync(topicName, sub.SubscriptionName, fromDeadLetter: false, cancellationToken);
-            int deadLetter = await CountSubscriptionMessagesAsync(topicName, sub.SubscriptionName, fromDeadLetter: true,  cancellationToken);
+            int active = await CountSubscriptionMessagesAsync(topicName, sub.SubscriptionName, fromDeadLetter: false,
+                cancellationToken);
+            int deadLetter = await CountSubscriptionMessagesAsync(topicName, sub.SubscriptionName, fromDeadLetter: true,
+                cancellationToken);
 
             result.Add(new SubscriptionInfo(
                 sub.SubscriptionName,
@@ -150,9 +151,9 @@ public sealed class TopicService
     {
         var options = new CreateSubscriptionOptions(topicName, subscriptionName)
         {
-            RequiresSession                  = requiresSession,
-            MaxDeliveryCount                 = maxDeliveryCount,
-            LockDuration                     = TimeSpan.FromSeconds(lockDurationSeconds),
+            RequiresSession = requiresSession,
+            MaxDeliveryCount = maxDeliveryCount,
+            LockDuration = TimeSpan.FromSeconds(lockDurationSeconds),
             DeadLetteringOnMessageExpiration = deadLetterOnMessageExpiration
         };
 
@@ -195,7 +196,7 @@ public sealed class TopicService
         var options = new CreateTopicOptions(name)
         {
             DefaultMessageTimeToLive = TimeSpan.FromSeconds(defaultMessageTtlSeconds),
-            EnableBatchedOperations  = enableBatchedOperations
+            EnableBatchedOperations = enableBatchedOperations
         };
 
         return AdminClient.CreateTopicAsync(options, cancellationToken);
@@ -218,7 +219,7 @@ public sealed class TopicService
         var message = new ServiceBusMessage(messageBody)
         {
             ContentType = "application/json",
-            MessageId   = Guid.NewGuid().ToString()
+            MessageId = Guid.NewGuid().ToString()
         };
 
         if (!string.IsNullOrWhiteSpace(sessionId))

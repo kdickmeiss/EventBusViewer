@@ -5,7 +5,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Create Topic</MudText>
         </MudStack>
     </TitleContent>
@@ -13,7 +13,7 @@
         @* ── Loading bar — visible as soon as the button is clicked ── *@
         @if (_creating)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
         }
         <MudForm @ref="_form" @bind-IsValid="_formValid">
             <MudStack Spacing="4">
@@ -30,9 +30,9 @@
                               Disabled="_creating"
                               Error="@(_nameError is not null)"
                               ErrorText="@_nameError"
-                              OnBlur="@(_ => _nameError = null)"/>
+                              OnBlur="@(_ => _nameError = null)" />
 
-                <MudDivider/>
+                <MudDivider />
 
                 @* ── TTL ── *@
                 <MudNumericField T="int"
@@ -43,16 +43,16 @@
                                  Max="3600"
                                  Required="true"
                                  Disabled="_creating"
-                                 HelperText="How long a message is retained if not consumed (1 – 3 600 s / up to 1 hour). Emulator limit."/>
+                                 HelperText="How long a message is retained if not consumed (1 – 3 600 s / up to 1 hour). Emulator limit." />
 
-                <MudDivider/>
+                <MudDivider />
 
                 @* ── Toggles ── *@
                 <MudSwitch T="bool"
                            @bind-Value="_enableBatchedOperations"
                            Label="Enable Batched Operations"
                            Color="Color.Primary"
-                           Disabled="_creating"/>
+                           Disabled="_creating" />
 
             </MudStack>
         </MudForm>
@@ -71,7 +71,7 @@
                    Disabled="@(_creating || !_formValid)">
             @if (_creating)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Creating…</span>
             }
             else

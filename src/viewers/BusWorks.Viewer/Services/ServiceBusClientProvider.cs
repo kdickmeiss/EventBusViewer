@@ -13,9 +13,9 @@ public sealed class ServiceBusClientProvider : IDisposable
     private readonly SettingsService _settings;
 
     private ServiceBusAdministrationClient? _adminClient;
-    private ServiceBusClient?               _busClient;
-    private string?                         _lastAdminCs;
-    private string?                         _lastClientCs;
+    private ServiceBusClient? _busClient;
+    private string? _lastAdminCs;
+    private string? _lastClientCs;
 
     public ServiceBusClientProvider(SettingsService settings)
     {
@@ -53,8 +53,8 @@ public sealed class ServiceBusClientProvider : IDisposable
     /// <summary>Forces both clients to be recreated on next access.</summary>
     public void Invalidate()
     {
-        _adminClient  = null;
-        _lastAdminCs  = null;
+        _adminClient = null;
+        _lastAdminCs = null;
         _lastClientCs = null;
         ServiceBusClient? old = _busClient;
         _busClient = null;
@@ -67,4 +67,3 @@ public sealed class ServiceBusClientProvider : IDisposable
         _busClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }
-

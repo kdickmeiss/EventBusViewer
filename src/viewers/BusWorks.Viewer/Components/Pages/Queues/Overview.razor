@@ -10,7 +10,7 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Queues Overview</MudText>
-    <MudSpacer/>
+    <MudSpacer />
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.AddCircle"
@@ -22,7 +22,7 @@
                    Color="Color.Primary"
                    OnClick="LoadQueuesAsync"
                    Disabled="_loading"
-                   title="Refresh queues"/>
+                   title="Refresh queues" />
 </MudStack>
 
 
@@ -35,7 +35,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Queue" Color="Color.Primary" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Queue" Color="Color.Primary" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Total Queues</MudText>
                     <MudText Typo="Typo.h5">@_queues.Count</MudText>
@@ -46,7 +46,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Message" Color="Color.Info" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Message" Color="Color.Info" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Total Messages</MudText>
                     <MudText Typo="Typo.h5">@FormatCount(_queues.Sum(q => q.TotalMessages))</MudText>
@@ -57,7 +57,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
                     <MudText Typo="Typo.h5">@FormatCount(_queues.Sum(q => q.ActiveMessages))</MudText>
@@ -68,7 +68,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
                     <MudText Typo="Typo.h5">@FormatCount(_queues.Sum(q => q.DeadLetterMessages))</MudText>
@@ -81,7 +81,8 @@
 @* ── Error alert ── *@
 @if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-6" ShowCloseIcon="true" CloseIconClicked="() => _error = null">
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-6" ShowCloseIcon="true"
+              CloseIconClicked="() => _error = null">
         @_error
     </MudAlert>
 }
@@ -99,22 +100,35 @@
           T="QueueInfo">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Queues</MudText>
-        <MudSpacer/>
+        <MudSpacer />
         <MudTextField @bind-Value="_searchTerm"
                       Placeholder="Search by name…"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
                       IconSize="Size.Medium"
                       Immediate="true"
-                      Class="mt-0"/>
+                      Class="mt-0" />
     </ToolBarContent>
     <HeaderContent>
-        <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Name)">Name</MudTableSortLabel></MudTh>
-        <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel></MudTh>
-        <MudTh><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.RequiresSession)">Session</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.DeadLetterMessages)">Dead-letter</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel></MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Name)">Name</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.RequiresSession)">Session</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.DeadLetterMessages)">Dead-letter
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<QueueInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel>
+        </MudTh>
         <MudTh Style="width:50px"></MudTh>
         <MudTh Style="width:50px"></MudTh>
         <MudTh Style="width:50px"></MudTh>
@@ -157,12 +171,14 @@
             }
         </MudTd>
         <MudTd DataLabel="Active" Style="text-align:right">
-            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
+            <MudChip T="string" Color="Color.Success" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
         </MudTd>
         <MudTd DataLabel="Dead-letter" Style="text-align:right">
             @if (context.DeadLetterMessages > 0)
             {
-                <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.DeadLetterMessages)</MudChip>
+                <MudChip T="string" Color="Color.Error" Size="Size.Small"
+                         Variant="Variant.Text">@FormatCount(context.DeadLetterMessages)</MudChip>
             }
             else
             {
@@ -170,7 +186,8 @@
             }
         </MudTd>
         <MudTd DataLabel="Total" Style="text-align:right">
-            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
+            <MudChip T="string" Color="Color.Info" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
         </MudTd>
         <MudTd Style="text-align:right">
             <MudTooltip Text="Send message to queue">
@@ -178,7 +195,7 @@
                                Size="Size.Small"
                                Color="Color.Secondary"
                                title="Send message"
-                               OnClick="@(() => OpenSendDialogAsync(context))"/>
+                               OnClick="@(() => OpenSendDialogAsync(context))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -187,7 +204,7 @@
                                Size="Size.Small"
                                Color="Color.Primary"
                                title="Edit queue"
-                               OnClick="@(() => OpenUpdateDialogAsync(context.Name))"/>
+                               OnClick="@(() => OpenUpdateDialogAsync(context.Name))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -196,7 +213,7 @@
                                Size="Size.Small"
                                Color="Color.Error"
                                title="Delete queue"
-                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))"/>
+                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -204,7 +221,7 @@
                            Size="Size.Small"
                            Color="Color.Primary"
                            title="View queue details"
-                           Href="@($"/queues/{Uri.EscapeDataString(context.Name)}")"/>
+                           Href="@($"/queues/{Uri.EscapeDataString(context.Name)}")" />
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
@@ -356,10 +373,11 @@
 
     private static Color StatusColor(EntityStatus status)
     {
-        if (status == EntityStatus.Active)          return Color.Success;
-        if (status == EntityStatus.Disabled)        return Color.Error;
-        if (status == EntityStatus.SendDisabled)    return Color.Warning;
+        if (status == EntityStatus.Active) return Color.Success;
+        if (status == EntityStatus.Disabled) return Color.Error;
+        if (status == EntityStatus.SendDisabled) return Color.Warning;
         if (status == EntityStatus.ReceiveDisabled) return Color.Warning;
         return Color.Default;
     }
+
 }

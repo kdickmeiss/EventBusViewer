@@ -103,6 +103,7 @@ internal sealed class ServiceBusPublisher(
         {
             await sender.DisposeAsync();
         }
+
         _senders.Clear();
     }
 }

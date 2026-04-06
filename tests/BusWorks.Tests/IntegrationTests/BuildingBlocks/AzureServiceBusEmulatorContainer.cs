@@ -16,7 +16,8 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// Entity provisioning (queues, topics, subscriptions) is intentionally <b>not</b> done here —
 /// each test class declares the entities it needs by overriding <c>EventBusTestBase.ProvisionEntitiesAsync</c>.
 /// </remarks>
-public sealed class AzureServiceBusEmulatorContainer{
+public sealed class AzureServiceBusEmulatorContainer
+{
     /// <summary>AMQP port used by <see cref="ServiceBusClient"/> for messaging.</summary>
     private const ushort AmqpPort = 5672;
 
@@ -48,7 +49,7 @@ public sealed class AzureServiceBusEmulatorContainer{
     {
         // 1. Create a network for the SQL Edge container
         INetwork? network = new NetworkBuilder().Build();
-        
+
         // 2. Create the SQL Edge container
         MsSqlContainer? sqlContainer = new MsSqlBuilder("mcr.microsoft.com/azure-sql-edge:latest")
             .WithNetwork(network)
@@ -57,13 +58,13 @@ public sealed class AzureServiceBusEmulatorContainer{
             .WithEnvironment("MSSQL_SA_PASSWORD", "Your_password123")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1433))
             .Build();
-        
+
         // 3. Create the Service Bus emulator container, linking to the SQL Edge container
         _container = new ServiceBusBuilder("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
             .WithMsSqlContainer(network, sqlContainer, "sql-edge", "Your_password123")
             .WithAcceptLicenseAgreement(true)
             .Build();
-        
+
         // _container = new ServiceBusBuilder("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
         //     .WithAcceptLicenseAgreement(true)
         //     // Bind both the AMQP and the HTTP management ports to random host ports so
@@ -80,7 +81,7 @@ public sealed class AzureServiceBusEmulatorContainer{
         //                 r.ForPort(HttpPort).ForPath("/health")))
         //     .Build();
     }
-    
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
@@ -101,12 +102,10 @@ public sealed class AzureServiceBusEmulatorContainer{
         Client = new ServiceBusClient(ConnectionString);
         AdminClient = new ServiceBusAdministrationClient(adminConnectionString);
     }
-    
+
     public async ValueTask DisposeAsync()
     {
         await Client.DisposeAsync();
         await _container.DisposeAsync();
     }
 }
-
-

@@ -10,7 +10,7 @@ public enum EventBusAuthenticationType
 
     /// <summary>Use an Azure AD App Registration (client-credentials flow).</summary>
     ApplicationRegistration,
-    
+
     /// <summary>Use the Azure CLI's logged-in user for authentication. This is intended for local development and testing only.</summary>
     AzureCli
 }
@@ -25,7 +25,7 @@ public sealed class BusWorksOptions
     public ConnectionStringOptions? ConnectionString { get; set; }
     public ManagedIdentityOptions? ManagedIdentity { get; set; }
     public ApplicationRegistrationOptions? ApplicationRegistration { get; set; }
-    
+
     public AzureCliOptions? AzureCli { get; set; }
 
     /// <summary>Max concurrent message-processing calls for non-session processors. Default: 10.</summary>
@@ -114,4 +114,3 @@ public sealed class AzureCliOptions
     /// </summary>
     public string FullyQualifiedNamespace { get; init; } = string.Empty;
 }
-

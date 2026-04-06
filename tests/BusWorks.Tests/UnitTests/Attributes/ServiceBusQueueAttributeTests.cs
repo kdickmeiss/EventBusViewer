@@ -5,7 +5,8 @@ using Xunit;
 namespace BusWorks.Tests.UnitTests.Attributes;
 
 [Trait("Category", "Unit")]
-public sealed class ServiceBusQueueAttributeTests{
+public sealed class ServiceBusQueueAttributeTests
+{
     [ServiceBusQueue]
     private sealed class ConsumerWithoutQueueName;
 
@@ -22,7 +23,7 @@ public sealed class ServiceBusQueueAttributeTests{
 
     [QueueRoute("sample-event-queue")]
     private sealed record SampleIntegrationEvent;
-    
+
     [Fact]
     public void DefaultConstructor_Defaults_AreCorrect()
     {
@@ -32,7 +33,7 @@ public sealed class ServiceBusQueueAttributeTests{
         attr.RequireSession.ShouldBeFalse();
         attr.MaxDeliveryCount.ShouldBe(5);
     }
-    
+
     [Fact]
     public void ExplicitConstructor_DoesNotTransformQueueName()
     {
@@ -43,7 +44,7 @@ public sealed class ServiceBusQueueAttributeTests{
 
         attr.QueueName.ShouldBe(name);
     }
-    
+
     [Fact]
     public void MaxDeliveryCount_CanBeSetToZero_ToDisableEnforcement()
     {
@@ -75,7 +76,7 @@ public sealed class ServiceBusQueueAttributeTests{
         attr.MaxDeliveryCount.ShouldBe(10);
         attr.RequireSession.ShouldBeTrue();
     }
-    
+
     [Fact]
     public void AttributeUsage_Contract_IsCorrect()
     {
@@ -85,7 +86,7 @@ public sealed class ServiceBusQueueAttributeTests{
         usage.Inherited.ShouldBeFalse();
         usage.AllowMultiple.ShouldBeFalse();
     }
-    
+
     [Fact]
     public void AppliedToClass_WithoutQueueName_AttributeIsPresent()
     {
@@ -131,7 +132,7 @@ public sealed class ServiceBusQueueAttributeTests{
 
         attr.ShouldBeNull();
     }
-    
+
     [Fact]
     public void MessageType_WithQueueRouteAttribute_QueueNameIsReachable()
     {
@@ -152,7 +153,7 @@ public sealed class ServiceBusQueueAttributeTests{
         usage.Inherited.ShouldBeFalse();
         usage.AllowMultiple.ShouldBeFalse();
     }
-    
+
     private static AttributeUsageAttribute GetAttributeUsage(Type attributeType) =>
         attributeType
             .GetCustomAttributes(typeof(AttributeUsageAttribute), inherit: false)

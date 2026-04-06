@@ -40,7 +40,7 @@ public sealed partial class TopicConsumerTests(EventBusHostFactory factory)
             SubscriptionName,
             new ServiceBusReceiverOptions
             {
-                SubQueue    = SubQueue.DeadLetter,
+                SubQueue = SubQueue.DeadLetter,
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
@@ -78,8 +78,7 @@ public sealed partial class TopicConsumerTests(EventBusHostFactory factory)
         {
             batch = await drainer.ReceiveMessagesAsync(
                 maxMessages: 100, maxWaitTime: TimeSpan.FromMilliseconds(300));
-        }
-        while (batch.Count > 0);
+        } while (batch.Count > 0);
     }
 
     [Fact]

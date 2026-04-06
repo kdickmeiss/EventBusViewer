@@ -340,10 +340,10 @@ public sealed class DependencyInjectionTests
         foreach (Type consumerType in consumerTypes)
         {
             ServiceDescriptor? descriptor = services.FirstOrDefault(sd => sd.ServiceType == consumerType);
-            descriptor.ShouldNotBeNull($"Consumer '{consumerType.Name}' should be registered in the service collection.");
-            descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped, $"Consumer '{consumerType.Name}' must be registered as Scoped.");
+            descriptor.ShouldNotBeNull(
+                $"Consumer '{consumerType.Name}' should be registered in the service collection.");
+            descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped,
+                $"Consumer '{consumerType.Name}' must be registered as Scoped.");
         }
     }
 }
-
-

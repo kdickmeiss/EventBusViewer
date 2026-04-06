@@ -31,7 +31,8 @@ internal static class ServiceBusEndpointResolver
                     $"Value must be >= 0.");
 
             string queueName = queueAttr.QueueName ?? ResolveQueueNameFromMessageType(consumerType, messageType);
-            return new ServiceBusEndpoint(queueName, RequireSession: queueAttr.RequireSession, MaxDeliveryCount: queueAttr.MaxDeliveryCount);
+            return new ServiceBusEndpoint(queueName, RequireSession: queueAttr.RequireSession,
+                MaxDeliveryCount: queueAttr.MaxDeliveryCount);
         }
 
         ServiceBusTopicAttribute? topicAttr = consumerType.GetCustomAttribute<ServiceBusTopicAttribute>();
@@ -43,7 +44,8 @@ internal static class ServiceBusEndpointResolver
                     $"Value must be >= 0.");
 
             string topicName = ResolveTopicNameFromMessageType(consumerType, messageType);
-            return new ServiceBusEndpoint(topicName, topicAttr.SubscriptionName, topicAttr.RequireSession, topicAttr.MaxDeliveryCount);
+            return new ServiceBusEndpoint(topicName, topicAttr.SubscriptionName, topicAttr.RequireSession,
+                topicAttr.MaxDeliveryCount);
         }
 
         throw new InvalidOperationException(
@@ -144,4 +146,3 @@ internal static class ServiceBusEndpointResolver
             $"Add [TopicRoute(\"topic-name\")] to '{messageType.Name}'.");
     }
 }
-

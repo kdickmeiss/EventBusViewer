@@ -5,7 +5,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Create Subscription</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@TopicName</MudChip>
         </MudStack>
@@ -13,7 +13,7 @@
     <DialogContent>
         @if (_creating)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
         }
         <MudForm @ref="_form" @bind-IsValid="_formValid">
             <MudStack Spacing="4">
@@ -30,9 +30,9 @@
                               Disabled="_creating"
                               Error="@(_nameError is not null)"
                               ErrorText="@_nameError"
-                              OnBlur="@(_ => _nameError = null)"/>
+                              OnBlur="@(_ => _nameError = null)" />
 
-                <MudDivider/>
+                <MudDivider />
 
                 @* ── Numeric settings ── *@
                 <MudNumericField T="int"
@@ -42,7 +42,7 @@
                                  Min="1"
                                  Required="true"
                                  Disabled="_creating"
-                                 HelperText="How many times delivery is attempted before the message is dead-lettered."/>
+                                 HelperText="How many times delivery is attempted before the message is dead-lettered." />
 
                 <MudNumericField T="int"
                                  @bind-Value="_lockDurationSeconds"
@@ -52,22 +52,22 @@
                                  Max="300"
                                  Required="true"
                                  Disabled="_creating"
-                                 HelperText="How long a received message stays locked (1 – 300 s)."/>
+                                 HelperText="How long a received message stays locked (1 – 300 s)." />
 
-                <MudDivider/>
+                <MudDivider />
 
                 @* ── Toggles ── *@
                 <MudSwitch T="bool"
                            @bind-Value="_requiresSession"
                            Label="Requires Session"
                            Color="Color.Primary"
-                           Disabled="_creating"/>
+                           Disabled="_creating" />
 
                 <MudSwitch T="bool"
                            @bind-Value="_deadLetterOnExpiry"
                            Label="Dead-letter on Message Expiry"
                            Color="Color.Primary"
-                           Disabled="_creating"/>
+                           Disabled="_creating" />
 
             </MudStack>
         </MudForm>
@@ -86,7 +86,7 @@
                    Disabled="@(_creating || !_formValid)">
             @if (_creating)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Creating…</span>
             }
             else

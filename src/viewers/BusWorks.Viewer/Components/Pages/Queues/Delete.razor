@@ -2,7 +2,9 @@
 @inject NavigationManager Nav
 
 @code {
+
     protected override void OnInitialized() =>
         Nav.NavigateTo("/queues/overview", replace: true);
+
 }
 

@@ -6,7 +6,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Edit Topic</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@TopicName</MudChip>
         </MudStack>
@@ -14,7 +14,7 @@
     <DialogContent>
         @if (_loading || _saving)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
         }
 
         @if (_loadError is not null)
@@ -40,7 +40,7 @@
                         <MudSelectItem Value="EntityStatus.ReceiveDisabled">Receive Disabled</MudSelectItem>
                     </MudSelect>
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     @* ── Default Message TTL ── *@
                     @if (_ttlIsMax)
@@ -57,19 +57,19 @@
                                      Min="1"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How long a message is retained if not consumed. E.g. 3 600 = 1 h · 86 400 = 1 day · 604 800 = 1 week."/>
+                                     HelperText="How long a message is retained if not consumed. E.g. 3 600 = 1 h · 86 400 = 1 day · 604 800 = 1 week." />
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     @* ── Toggles ── *@
                     <MudSwitch T="bool"
                                @bind-Value="_enableBatchedOperations"
                                Label="Enable Batched Operations"
                                Color="Color.Primary"
-                               Disabled="_saving"/>
+                               Disabled="_saving" />
 
                     @* ── Read-only info ── *@
-                    <MudDivider/>
+                    <MudDivider />
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Read-only properties</MudText>
                     <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
                         <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small"
@@ -107,7 +107,7 @@
                    Disabled="@(_loading || _saving || !_formValid || _loadError is not null)">
             @if (_saving)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Saving…</span>
             }
             else
@@ -145,12 +145,12 @@
         {
             _props = await TopicService.GetTopicPropertiesAsync(TopicName);
 
-            _status                  = _props.Status;
+            _status = _props.Status;
             _enableBatchedOperations = _props.EnableBatchedOperations;
 
             _ttlIsMax = _props.DefaultMessageTimeToLive == TimeSpan.MaxValue;
             _defaultMessageTtlSeconds = _ttlIsMax
-                ? 3_600   // sensible default shown when overriding a "never-expire" TTL
+                ? 3_600 // sensible default shown when overriding a "never-expire" TTL
                 : (long)_props.DefaultMessageTimeToLive.TotalSeconds;
         }
         catch (Exception ex)
@@ -172,8 +172,8 @@
             if (!_formValid) return;
 
             // Apply editable settings back onto the live properties object
-            _props!.Status                  = _status;
-            _props.EnableBatchedOperations  = _enableBatchedOperations;
+            _props!.Status = _status;
+            _props.EnableBatchedOperations = _enableBatchedOperations;
             _props.DefaultMessageTimeToLive = TimeSpan.FromSeconds(_defaultMessageTtlSeconds);
 
             await TopicService.UpdateTopicAsync(_props);

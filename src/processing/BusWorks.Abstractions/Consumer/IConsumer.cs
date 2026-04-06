@@ -64,4 +64,3 @@ public interface IConsumer<in TMessage> where TMessage : class, IIntegrationEven
     /// </param>
     Task Consume(IConsumeContext<TMessage> context);
 }
-

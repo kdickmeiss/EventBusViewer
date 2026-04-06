@@ -10,7 +10,7 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Topics Overview</MudText>
-    <MudSpacer/>
+    <MudSpacer />
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.AddCircle"
@@ -22,7 +22,7 @@
                    Color="Color.Primary"
                    OnClick="LoadTopicsAsync"
                    Disabled="_loading"
-                   title="Refresh topics"/>
+                   title="Refresh topics" />
 </MudStack>
 
 <MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
@@ -34,7 +34,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Topic" Color="Color.Primary" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Total Topics</MudText>
                     <MudText Typo="Typo.h5">@_topics.Count</MudText>
@@ -45,7 +45,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Subscriptions" Color="Color.Secondary" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Subscriptions" Color="Color.Secondary" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Total Subscriptions</MudText>
                     <MudText Typo="Typo.h5">@_topics.Sum(t => t.SubscriptionCount)</MudText>
@@ -56,7 +56,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Active Messages</MudText>
                     <MudText Typo="Typo.h5">@FormatCount(_topics.Sum(t => t.ActiveMessages))</MudText>
@@ -67,7 +67,7 @@
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Class="pa-4" Elevation="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large"/>
+                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
                 <MudStack Spacing="0">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Dead-letter Messages</MudText>
                     <MudText Typo="Typo.h5">@FormatCount(_topics.Sum(t => t.DeadLetterMessages))</MudText>
@@ -80,7 +80,8 @@
 @* ── Error alert ── *@
 @if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-6" ShowCloseIcon="true" CloseIconClicked="() => _error = null">
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-6" ShowCloseIcon="true"
+              CloseIconClicked="() => _error = null">
         @_error
     </MudAlert>
 }
@@ -98,22 +99,36 @@
           T="TopicInfo">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Topics</MudText>
-        <MudSpacer/>
+        <MudSpacer />
         <MudTextField @bind-Value="_searchTerm"
                       Placeholder="Search by name…"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
                       IconSize="Size.Medium"
                       Immediate="true"
-                      Class="mt-0"/>
+                      Class="mt-0" />
     </ToolBarContent>
     <HeaderContent>
-        <MudTh><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Name)">Name</MudTableSortLabel></MudTh>
-        <MudTh><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.SubscriptionCount)">Subscriptions</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.DeadLetterMessages)">Dead-letter</MudTableSortLabel></MudTh>
-        <MudTh Style="text-align:right"><MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel></MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Name)">Name</MudTableSortLabel>
+        </MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.Status.ToString())">Status</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.SubscriptionCount)">Subscriptions
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.ActiveMessages)">Active</MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.DeadLetterMessages)">Dead-letter
+            </MudTableSortLabel>
+        </MudTh>
+        <MudTh Style="text-align:right">
+            <MudTableSortLabel SortBy="new Func<TopicInfo, object>(x => x.TotalMessages)">Total</MudTableSortLabel>
+        </MudTh>
         <MudTh Style="width:50px"></MudTh>
         <MudTh Style="width:50px"></MudTh>
         <MudTh Style="width:50px"></MudTh>
@@ -138,15 +153,18 @@
             </MudChip>
         </MudTd>
         <MudTd DataLabel="Subscriptions" Style="text-align:right">
-            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Text">@context.SubscriptionCount</MudChip>
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small"
+                     Variant="Variant.Text">@context.SubscriptionCount</MudChip>
         </MudTd>
         <MudTd DataLabel="Active" Style="text-align:right">
-            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
+            <MudChip T="string" Color="Color.Success" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.ActiveMessages)</MudChip>
         </MudTd>
         <MudTd DataLabel="Dead-letter" Style="text-align:right">
             @if (context.DeadLetterMessages > 0)
             {
-                <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.DeadLetterMessages)</MudChip>
+                <MudChip T="string" Color="Color.Error" Size="Size.Small"
+                         Variant="Variant.Text">@FormatCount(context.DeadLetterMessages)</MudChip>
             }
             else
             {
@@ -154,7 +172,8 @@
             }
         </MudTd>
         <MudTd DataLabel="Total" Style="text-align:right">
-            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
+            <MudChip T="string" Color="Color.Info" Size="Size.Small"
+                     Variant="Variant.Text">@FormatCount(context.TotalMessages)</MudChip>
         </MudTd>
         <MudTd Style="text-align:right">
             <MudTooltip Text="Send message to topic">
@@ -162,7 +181,7 @@
                                Size="Size.Small"
                                Color="Color.Secondary"
                                title="Send message"
-                               OnClick="@(() => OpenSendDialogAsync(context))"/>
+                               OnClick="@(() => OpenSendDialogAsync(context))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -171,7 +190,7 @@
                                Size="Size.Small"
                                Color="Color.Primary"
                                title="Edit topic"
-                               OnClick="@(() => OpenEditDialogAsync(context.Name))"/>
+                               OnClick="@(() => OpenEditDialogAsync(context.Name))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -180,7 +199,7 @@
                                Size="Size.Small"
                                Color="Color.Error"
                                title="Delete topic"
-                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))"/>
+                               OnClick="@(() => OpenDeleteDialogAsync(context.Name))" />
             </MudTooltip>
         </MudTd>
         <MudTd Style="text-align:right">
@@ -188,7 +207,7 @@
                            Size="Size.Small"
                            Color="Color.Primary"
                            title="View topic details"
-                           Href="@($"/topics/{Uri.EscapeDataString(context.Name)}")"/>
+                           Href="@($"/topics/{Uri.EscapeDataString(context.Name)}")" />
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
@@ -237,10 +256,10 @@
 
         var options = new DialogOptions
         {
-            MaxWidth         = MaxWidth.Medium,
-            FullWidth        = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
             CloseOnEscapeKey = true,
-            CloseButton      = true
+            CloseButton = true
         };
 
         IDialogReference dialog = await DialogService.ShowAsync<SendTopicMessageDialog>(
@@ -279,10 +298,10 @@
 
         var options = new DialogOptions
         {
-            MaxWidth         = MaxWidth.Small,
-            FullWidth        = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
             CloseOnEscapeKey = true,
-            CloseButton      = true
+            CloseButton = true
         };
 
         IDialogReference dialog = await DialogService.ShowAsync<UpdateTopicDialog>(
@@ -327,12 +346,13 @@
 
     private static Color StatusColor(EntityStatus status)
     {
-        if (status == EntityStatus.Active)          return Color.Success;
-        if (status == EntityStatus.Disabled)        return Color.Error;
-        if (status == EntityStatus.SendDisabled)    return Color.Warning;
+        if (status == EntityStatus.Active) return Color.Success;
+        if (status == EntityStatus.Disabled) return Color.Error;
+        if (status == EntityStatus.SendDisabled) return Color.Warning;
         if (status == EntityStatus.ReceiveDisabled) return Color.Warning;
         return Color.Default;
     }
+
 }
 
 

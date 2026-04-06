@@ -20,7 +20,7 @@ public sealed class ServiceBusTopicAttributeTests
 
     [TopicRoute("park-events")]
     private sealed record ParkIntegrationEvent;
-    
+
     [Fact]
     public void Constructor_DoesNotTransformSubscriptionName()
     {
@@ -40,7 +40,7 @@ public sealed class ServiceBusTopicAttributeTests
         attr.RequireSession.ShouldBeFalse();
         attr.MaxDeliveryCount.ShouldBe(5);
     }
-    
+
     [Fact]
     public void MaxDeliveryCount_CanBeSetToZero_ToDisableEnforcement()
     {
@@ -72,7 +72,7 @@ public sealed class ServiceBusTopicAttributeTests
         attr.MaxDeliveryCount.ShouldBe(10);
         attr.RequireSession.ShouldBeTrue();
     }
-    
+
     [Fact]
     public void AttributeUsage_Contract_IsCorrect()
     {
@@ -82,7 +82,7 @@ public sealed class ServiceBusTopicAttributeTests
         usage.Inherited.ShouldBeFalse();
         usage.AllowMultiple.ShouldBeFalse();
     }
-    
+
     [Fact]
     public void AppliedToClass_SubscriptionName_IsReachableViaReflection()
     {
@@ -117,7 +117,7 @@ public sealed class ServiceBusTopicAttributeTests
 
         attr.ShouldBeNull();
     }
-    
+
     [Fact]
     public void MessageType_WithTopicRouteAttribute_TopicNameIsReachable()
     {
@@ -138,7 +138,7 @@ public sealed class ServiceBusTopicAttributeTests
         usage.Inherited.ShouldBeFalse();
         usage.AllowMultiple.ShouldBeFalse();
     }
-    
+
     private static AttributeUsageAttribute GetAttributeUsage(Type attributeType) =>
         attributeType
             .GetCustomAttributes(typeof(AttributeUsageAttribute), inherit: false)

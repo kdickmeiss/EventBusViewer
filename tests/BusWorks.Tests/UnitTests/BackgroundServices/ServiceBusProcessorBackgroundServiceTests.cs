@@ -138,7 +138,8 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("order-queue", RequireSession: true);
 
-        Should.Throw<InvalidOperationException>(() => InvokeValidateSessionContract(typeof(SessionConsumerForNonSessionedMessage), endpoint))
+        Should.Throw<InvalidOperationException>(() =>
+                InvokeValidateSessionContract(typeof(SessionConsumerForNonSessionedMessage), endpoint))
             .Message.ShouldContain(nameof(SessionConsumerForNonSessionedMessage));
     }
 
@@ -147,7 +148,8 @@ public sealed partial class ServiceBusProcessorBackgroundServiceTests
     {
         ServiceBusEndpoint endpoint = new("session-queue", RequireSession: false);
 
-        Should.Throw<InvalidOperationException>(() => InvokeValidateSessionContract(typeof(NonSessionConsumerForSessionedMessage), endpoint))
+        Should.Throw<InvalidOperationException>(() =>
+                InvokeValidateSessionContract(typeof(NonSessionConsumerForSessionedMessage), endpoint))
             .Message.ShouldContain(nameof(SessionMessage));
     }
 

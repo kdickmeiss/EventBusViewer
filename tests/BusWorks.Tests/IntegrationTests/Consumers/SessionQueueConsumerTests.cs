@@ -25,7 +25,7 @@ public sealed partial class SessionQueueConsumerTests(EventBusHostFactory factor
             SessionQueueName,
             new ServiceBusReceiverOptions
             {
-                SubQueue    = SubQueue.DeadLetter,
+                SubQueue = SubQueue.DeadLetter,
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
@@ -66,18 +66,20 @@ public sealed partial class SessionQueueConsumerTests(EventBusHostFactory factor
         await DrainAsync();
 
         string sharedCustomerId = $"cust_{Guid.NewGuid():N}";
-        var first  = new CustomerPaymentCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, sharedCustomerId, 10m);
+        var first = new CustomerPaymentCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, sharedCustomerId, 10m);
         var second = new CustomerPaymentCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, sharedCustomerId, 20m);
 
         TestConsumerCapture<CustomerPaymentCreatedEvent> capture =
             GetRequiredService<TestConsumerCapture<CustomerPaymentCreatedEvent>>();
 
         // Publish in order and collect exactly two deliveries.
-        await PublishAsync(first,  TestContext.Current.CancellationToken);
+        await PublishAsync(first, TestContext.Current.CancellationToken);
         await PublishAsync(second, TestContext.Current.CancellationToken);
 
-        (CustomerPaymentCreatedEvent receivedFirst,  _) = await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
-        (CustomerPaymentCreatedEvent receivedSecond, _) = await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+        (CustomerPaymentCreatedEvent receivedFirst, _) =
+            await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
+        (CustomerPaymentCreatedEvent receivedSecond, _) =
+            await capture.ReadAsync(ReceiveTimeout, TestContext.Current.CancellationToken);
 
         // Both must be for the shared session and in the original order.
         receivedFirst.CustomerId.ShouldBe(sharedCustomerId);
@@ -86,5 +88,3 @@ public sealed partial class SessionQueueConsumerTests(EventBusHostFactory factor
         receivedSecond.Id.ShouldBe(second.Id);
     }
 }
-
-

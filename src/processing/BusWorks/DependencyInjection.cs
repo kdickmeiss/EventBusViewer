@@ -35,16 +35,16 @@ public static class DependencyInjection
         params Assembly[] consumerAssemblies)
     {
         BusWorksOptions worksOptions = configuration
-                                      .GetSection(BusWorksOptions.SectionName)
-                                      .Get<BusWorksOptions>()
-                                  ?? throw new InvalidOperationException(
-                                      $"The '{BusWorksOptions.SectionName}' configuration section is missing or empty.");
-        
+                                           .GetSection(BusWorksOptions.SectionName)
+                                           .Get<BusWorksOptions>()
+                                       ?? throw new InvalidOperationException(
+                                           $"The '{BusWorksOptions.SectionName}' configuration section is missing or empty.");
+
         services.Configure<BusWorksOptions>(configuration.GetSection(BusWorksOptions.SectionName));
 
         return services.AddBusWorksCore(worksOptions, consumerAssemblies);
     }
-    
+
     /// <summary>
     /// Registers BusWorks services using a pre-built <see cref="BusWorksOptions"/> instance.
     /// </summary>
@@ -64,12 +64,11 @@ public static class DependencyInjection
         BusWorksOptions worksOptions,
         params Assembly[] consumerAssemblies)
     {
-        
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(worksOptions));
 
         return services.AddBusWorksCore(worksOptions, consumerAssemblies);
     }
-    
+
     /// <summary>
     /// Registers BusWorks services using a configuration delegate.
     /// </summary>
@@ -96,12 +95,12 @@ public static class DependencyInjection
     {
         var options = new BusWorksOptions();
         configure(options);
-        
+
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(options));
 
         return services.AddBusWorks(options, consumerAssemblies);
     }
-    
+
     /// <summary>
     /// Core registration logic shared by all public <c>AddBusWorks</c> overloads.
     /// Builds the <see cref="ServiceBusClient"/>, registers consumer types discovered from
@@ -132,8 +131,8 @@ public static class DependencyInjection
 
         return services;
     }
-    
-    
+
+
     /// <summary>
     /// Creates and returns a <see cref="ServiceBusClient"/> configured according to the
     /// <see cref="BusWorksOptions.AuthenticationType"/> specified in <paramref name="worksOptions"/>.
@@ -146,41 +145,42 @@ public static class DependencyInjection
     /// </exception>
     private static ServiceBusClient GetServiceBusClientByConfig(BusWorksOptions worksOptions) =>
         worksOptions.AuthenticationType switch
-            {
-                EventBusAuthenticationType.ConnectionString =>
-                    new ServiceBusClient(
-                        worksOptions.ConnectionString?.ConnectionString
-                        ?? throw new InvalidOperationException(
-                            $"EventBusOptions.ConnectionString.ConnectionString is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ConnectionString)}'")),
+        {
+            EventBusAuthenticationType.ConnectionString =>
+                new ServiceBusClient(
+                    worksOptions.ConnectionString?.ConnectionString
+                    ?? throw new InvalidOperationException(
+                        $"EventBusOptions.ConnectionString.ConnectionString is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ConnectionString)}'")),
 
-                EventBusAuthenticationType.ManagedIdentity =>
-                    new ServiceBusClient(
-                        worksOptions.ManagedIdentity?.FullyQualifiedNamespace
-                        ?? throw new InvalidOperationException(
-                            $"EventBusOptions.ManagedIdentity.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ManagedIdentity)}'"),
-                        worksOptions.ManagedIdentity.ClientId is { Length: > 0 } clientId
-                             ? new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId))   // user-assigned
-                            : new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned)),                     // system-assigned
-                
-                EventBusAuthenticationType.AzureCli =>
-                    new ServiceBusClient(
-                        worksOptions.AzureCli?.FullyQualifiedNamespace
-                        ?? throw new InvalidOperationException(
-                            $"EventBusOptions.AzureCli.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.AzureCli)}'"),
-                        new AzureCliCredential()),
+            EventBusAuthenticationType.ManagedIdentity =>
+                new ServiceBusClient(
+                    worksOptions.ManagedIdentity?.FullyQualifiedNamespace
+                    ?? throw new InvalidOperationException(
+                        $"EventBusOptions.ManagedIdentity.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ManagedIdentity)}'"),
+                    worksOptions.ManagedIdentity.ClientId is { Length: > 0 } clientId
+                        ? new ManagedIdentityCredential(
+                            ManagedIdentityId.FromUserAssignedClientId(clientId)) // user-assigned
+                        : new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned)), // system-assigned
 
-                EventBusAuthenticationType.ApplicationRegistration =>
-                    new ServiceBusClient(
-                        worksOptions.ApplicationRegistration?.FullyQualifiedNamespace
-                        ?? throw new InvalidOperationException(
-                            $"EventBusOptions.ApplicationRegistration.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ApplicationRegistration)}'"),
-                        new ClientSecretCredential(
-                            worksOptions.ApplicationRegistration.TenantId,
-                            worksOptions.ApplicationRegistration.ClientId,
-                            worksOptions.ApplicationRegistration.ClientSecret)),
+            EventBusAuthenticationType.AzureCli =>
+                new ServiceBusClient(
+                    worksOptions.AzureCli?.FullyQualifiedNamespace
+                    ?? throw new InvalidOperationException(
+                        $"EventBusOptions.AzureCli.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.AzureCli)}'"),
+                    new AzureCliCredential()),
 
-                _ => throw new InvalidOperationException(
-                    $"Unsupported EventBus authentication type: '{worksOptions.AuthenticationType}'. " +
-                    $"Valid values are: {string.Join(", ", Enum.GetNames<EventBusAuthenticationType>())}")
-            };
+            EventBusAuthenticationType.ApplicationRegistration =>
+                new ServiceBusClient(
+                    worksOptions.ApplicationRegistration?.FullyQualifiedNamespace
+                    ?? throw new InvalidOperationException(
+                        $"EventBusOptions.ApplicationRegistration.FullyQualifiedNamespace is required when AuthenticationType is '{nameof(EventBusAuthenticationType.ApplicationRegistration)}'"),
+                    new ClientSecretCredential(
+                        worksOptions.ApplicationRegistration.TenantId,
+                        worksOptions.ApplicationRegistration.ClientId,
+                        worksOptions.ApplicationRegistration.ClientSecret)),
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported EventBus authentication type: '{worksOptions.AuthenticationType}'. " +
+                $"Valid values are: {string.Join(", ", Enum.GetNames<EventBusAuthenticationType>())}")
+        };
 }

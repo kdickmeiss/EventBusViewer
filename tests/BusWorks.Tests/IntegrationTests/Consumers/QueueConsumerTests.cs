@@ -21,8 +21,8 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
             QueueName,
             new ServiceBusReceiverOptions
             {
-                SubQueue     = SubQueue.DeadLetter,
-                ReceiveMode  = ServiceBusReceiveMode.ReceiveAndDelete
+                SubQueue = SubQueue.DeadLetter,
+                ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
             });
 
     protected override void AssertDeserializedEvent(
@@ -51,20 +51,20 @@ public sealed partial class QueueConsumerTests(EventBusHostFactory factory)
         DateTime expectedOccurredOn = DateTime.UtcNow;
 
         string body = $$"""
-            {
-              "ID": "{{expectedId}}",
-              "occurredonutc": "{{expectedOccurredOn:O}}",
-              "SPOTCODE": "B-07",
-              "userid": "usr_casetest",
-              "HourlyRate": 5.00
-            }
-            """;
+                        {
+                          "ID": "{{expectedId}}",
+                          "occurredonutc": "{{expectedOccurredOn:O}}",
+                          "SPOTCODE": "B-07",
+                          "userid": "usr_casetest",
+                          "HourlyRate": 5.00
+                        }
+                        """;
 
         await using ServiceBusSender sender = Emulator.Client.CreateSender(QueueName);
         await sender.SendMessageAsync(new ServiceBusMessage(body)
         {
             ContentType = "application/json",
-            MessageId   = expectedId.ToString()
+            MessageId = expectedId.ToString()
         }, TestContext.Current.CancellationToken);
 
         // Act — the background service picks up the message, deserializes it via the real

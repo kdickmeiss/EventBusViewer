@@ -5,14 +5,14 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error"/>
+            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" />
             <MudText Typo="Typo.h6">Delete Subscription</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
         @if (_deleting)
         {
-            <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Error" Indeterminate="true" Class="mb-4" />
         }
 
         <MudStack Spacing="3">
@@ -22,7 +22,8 @@
             </MudText>
 
             <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
-                This action is <strong>irreversible</strong>. The subscription and all its messages will be permanently deleted.
+                This action is <strong>irreversible</strong>. The subscription and all its messages will be permanently
+                deleted.
             </MudAlert>
         </MudStack>
     </DialogContent>
@@ -40,7 +41,7 @@
                    Disabled="_deleting">
             @if (_deleting)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Deleting…</span>
             }
             else
@@ -54,7 +55,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
-    [Parameter, EditorRequired] public string TopicName        { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string TopicName { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string SubscriptionName { get; set; } = string.Empty;
 
     private bool _deleting;

@@ -14,4 +14,3 @@ namespace BusWorks.Tests.IntegrationTests.BuildingBlocks;
 /// </summary>
 [CollectionDefinition(nameof(IntegrationTestCollection))]
 public class IntegrationTestCollection : ICollectionFixture<EventBusHostFactory>;
-

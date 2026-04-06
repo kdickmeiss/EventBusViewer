@@ -51,4 +51,3 @@ public sealed class ServiceBusTopicAttribute(string subscriptionName) : Attribut
     /// </summary>
     public int MaxDeliveryCount { get; init; } = 5;
 }
-

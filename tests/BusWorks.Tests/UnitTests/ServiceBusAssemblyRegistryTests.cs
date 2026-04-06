@@ -31,7 +31,9 @@ public sealed class ServiceBusAssemblyRegistryTests
     }
 
     /// <summary>Plain class — must be excluded because it does not implement <see cref="IConsumer{TMessage}"/>.</summary>
-    private sealed class NotAConsumerForRegistry { }
+    private sealed class NotAConsumerForRegistry
+    {
+    }
 
     // ── No assemblies ─────────────────────────────────────────────────────────
 
@@ -138,7 +140,7 @@ public sealed class ServiceBusAssemblyRegistryTests
         Assembly processingAssembly = typeof(ServiceBusAssemblyRegistry).Assembly;
 
         var singleRegistry = new ServiceBusAssemblyRegistry(testAssembly);
-        var multiRegistry  = new ServiceBusAssemblyRegistry(testAssembly, processingAssembly);
+        var multiRegistry = new ServiceBusAssemblyRegistry(testAssembly, processingAssembly);
 
         // Assert — every consumer from the single-assembly scan must be present in the
         // multi-assembly scan, proving the SelectMany aggregation path runs correctly.
@@ -146,4 +148,3 @@ public sealed class ServiceBusAssemblyRegistryTests
             multiRegistry.GetConsumerTypes().ShouldContain(consumerType);
     }
 }
-

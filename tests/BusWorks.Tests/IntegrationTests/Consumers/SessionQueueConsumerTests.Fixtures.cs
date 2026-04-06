@@ -39,5 +39,3 @@ public sealed partial class SessionQueueConsumerTests
             => capture.WriteAsync(context.Message, context.Metadata, context.CancellationToken).AsTask();
     }
 }
-
-

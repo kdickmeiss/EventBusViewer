@@ -63,7 +63,8 @@ public sealed class BusWorksOptionsTests
     [InlineData(EventBusAuthenticationType.ManagedIdentity, 1)]
     [InlineData(EventBusAuthenticationType.ApplicationRegistration, 2)]
     [InlineData(EventBusAuthenticationType.AzureCli, 3)]
-    public void AuthenticationType_IntegerValue_IsStable(EventBusAuthenticationType authenticationType, int expectedValue)
+    public void AuthenticationType_IntegerValue_IsStable(EventBusAuthenticationType authenticationType,
+        int expectedValue)
     {
         int value = (int)authenticationType;
 
@@ -89,7 +90,8 @@ public sealed class BusWorksOptionsTests
     [Fact]
     public void ConnectionStringOptions_ConnectionString_CanBeSet()
     {
-        const string value = "Endpoint=sb://my-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123";
+        const string value =
+            "Endpoint=sb://my-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123";
         var options = new ConnectionStringOptions { ConnectionString = value };
 
         options.ConnectionString.ShouldBe(value);

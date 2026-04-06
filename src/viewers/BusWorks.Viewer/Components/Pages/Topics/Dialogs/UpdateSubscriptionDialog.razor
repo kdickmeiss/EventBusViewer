@@ -6,7 +6,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Edit Subscription</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
                 @TopicName / @SubscriptionName
@@ -16,7 +16,7 @@
     <DialogContent>
         @if (_loading || _saving)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
         }
 
         @if (_loadError is not null)
@@ -41,7 +41,7 @@
                         <MudSelectItem Value="EntityStatus.ReceiveDisabled">Receive Disabled</MudSelectItem>
                     </MudSelect>
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     @* ── Numeric settings ── *@
                     <MudNumericField T="int"
@@ -51,7 +51,7 @@
                                      Min="1"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How many times delivery is attempted before the message is dead-lettered."/>
+                                     HelperText="How many times delivery is attempted before the message is dead-lettered." />
 
                     <MudNumericField T="int"
                                      @bind-Value="_lockDurationSeconds"
@@ -61,7 +61,7 @@
                                      Max="300"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How long a received message stays locked (1 – 300 s)."/>
+                                     HelperText="How long a received message stays locked (1 – 300 s)." />
 
                     <MudNumericField T="int"
                                      @bind-Value="_messageTtlSeconds"
@@ -71,24 +71,24 @@
                                      Max="3600"
                                      Required="true"
                                      Disabled="_saving"
-                                     HelperText="How long a message stays in this subscription before expiring (1 – 3 600 s). Emulator limit."/>
+                                     HelperText="How long a message stays in this subscription before expiring (1 – 3 600 s). Emulator limit." />
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     @* ── Toggles ── *@
                     <MudSwitch T="bool"
                                @bind-Value="_deadLetterOnExpiry"
                                Label="Dead-letter on Message Expiry"
                                Color="Color.Primary"
-                               Disabled="_saving"/>
+                               Disabled="_saving" />
 
                     <MudSwitch T="bool"
                                @bind-Value="_enableBatchedOperations"
                                Label="Enable Batched Operations"
                                Color="Color.Primary"
-                               Disabled="_saving"/>
+                               Disabled="_saving" />
 
-                    <MudDivider/>
+                    <MudDivider />
 
                     @* ── Immutable info ── *@
                     <MudTooltip Text="Requires Session cannot be changed after creation.">
@@ -119,7 +119,7 @@
                    Disabled="@(_loading || _saving || !_formValid || _loadError is not null)">
             @if (_saving)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Saving…</span>
             }
             else
@@ -133,35 +133,35 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
-    [Parameter, EditorRequired] public string TopicName        { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string TopicName { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string SubscriptionName { get; set; } = string.Empty;
 
     private MudForm _form = null!;
-    private bool    _formValid = true;
+    private bool _formValid = true;
 
     private SubscriptionProperties? _props;
-    private string?  _loadError;
-    private bool     _loading;
-    private bool     _saving;
+    private string? _loadError;
+    private bool _loading;
+    private bool _saving;
 
     private EntityStatus _status;
-    private int          _maxDeliveryCount;
-    private int          _lockDurationSeconds;
-    private int          _messageTtlSeconds;
-    private bool         _deadLetterOnExpiry;
-    private bool         _enableBatchedOperations;
+    private int _maxDeliveryCount;
+    private int _lockDurationSeconds;
+    private int _messageTtlSeconds;
+    private bool _deadLetterOnExpiry;
+    private bool _enableBatchedOperations;
 
     protected override async Task OnInitializedAsync()
     {
         _loading = true;
         try
         {
-            _props                   = await TopicService.GetSubscriptionPropertiesAsync(TopicName, SubscriptionName);
-            _status                  = _props.Status;
-            _maxDeliveryCount        = _props.MaxDeliveryCount;
-            _lockDurationSeconds     = (int)_props.LockDuration.TotalSeconds;
-            _messageTtlSeconds       = Math.Clamp((int)_props.DefaultMessageTimeToLive.TotalSeconds, 1, 3600);
-            _deadLetterOnExpiry      = _props.DeadLetteringOnMessageExpiration;
+            _props = await TopicService.GetSubscriptionPropertiesAsync(TopicName, SubscriptionName);
+            _status = _props.Status;
+            _maxDeliveryCount = _props.MaxDeliveryCount;
+            _lockDurationSeconds = (int)_props.LockDuration.TotalSeconds;
+            _messageTtlSeconds = Math.Clamp((int)_props.DefaultMessageTimeToLive.TotalSeconds, 1, 3600);
+            _deadLetterOnExpiry = _props.DeadLetteringOnMessageExpiration;
             _enableBatchedOperations = _props.EnableBatchedOperations;
         }
         catch (Exception ex)
@@ -182,12 +182,12 @@
             await _form.ValidateAsync();
             if (!_formValid) return;
 
-            _props!.Status                          = _status;
-            _props.MaxDeliveryCount                 = _maxDeliveryCount;
-            _props.LockDuration                     = TimeSpan.FromSeconds(_lockDurationSeconds);
-            _props.DefaultMessageTimeToLive         = TimeSpan.FromSeconds(_messageTtlSeconds);
+            _props!.Status = _status;
+            _props.MaxDeliveryCount = _maxDeliveryCount;
+            _props.LockDuration = TimeSpan.FromSeconds(_lockDurationSeconds);
+            _props.DefaultMessageTimeToLive = TimeSpan.FromSeconds(_messageTtlSeconds);
             _props.DeadLetteringOnMessageExpiration = _deadLetterOnExpiry;
-            _props.EnableBatchedOperations          = _enableBatchedOperations;
+            _props.EnableBatchedOperations = _enableBatchedOperations;
 
             await TopicService.UpdateSubscriptionAsync(_props);
             Snackbar.Add($"Subscription \"{SubscriptionName}\" updated successfully.", Severity.Success);

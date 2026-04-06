@@ -83,8 +83,9 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("null"), messageId: "msg-null");
         var consumer = new TrackingConsumer();
 
-        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
+        InvalidOperationException exception =
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
 
         exception.Message.ShouldContain("msg-null");
         exception.Message.ShouldContain(nameof(TestEvent));
@@ -96,8 +97,7 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(BinaryData.FromString("{not valid json}"));
         var consumer = new TrackingConsumer();
 
-        await Should.ThrowAsync<JsonException>(
-            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<JsonException>(() => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -107,8 +107,9 @@ public sealed partial class ServiceBusConsumerTests
         ServiceBusReceivedMessage raw = CreateMessage(body);
         var consumer = new FaultingConsumer();
 
-        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
+        InvalidOperationException exception =
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                InvokeAsync(consumer, raw, TestContext.Current.CancellationToken));
 
         exception.ShouldBeSameAs(FaultingConsumer.Error);
     }

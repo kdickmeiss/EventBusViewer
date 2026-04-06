@@ -7,7 +7,7 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Send" Color="Color.Primary"/>
+            <MudIcon Icon="@Icons.Material.Filled.Send" Color="Color.Primary" />
             <MudText Typo="Typo.h6">Send Message</MudText>
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">@TopicName</MudChip>
         </MudStack>
@@ -15,7 +15,7 @@
     <DialogContent>
         @if (_loadingSubscriptions)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4"/>
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
         }
 
         <MudStack Spacing="4">
@@ -40,7 +40,7 @@
                               Disabled="_sending"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Tag"
-                              HelperText="Every subscription on this topic requires sessions. All messages must carry a Session ID."/>
+                              HelperText="Every subscription on this topic requires sessions. All messages must carry a Session ID." />
             }
             else if (!_loadingSubscriptions && _someRequireSessions)
             {
@@ -62,7 +62,7 @@
                               Disabled="_sending"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Tag"
-                              HelperText="Recommended: include a Session ID so session-enabled subscriptions can consume this message."/>
+                              HelperText="Recommended: include a Session ID so session-enabled subscriptions can consume this message." />
             }
             @* No session subscriptions → field hidden entirely *@
 
@@ -80,7 +80,7 @@
                           Style="font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:0.875rem;"
                           Error="_validationError is not null"
                           ErrorText="@_validationError"
-                          Disabled="_sending"/>
+                          Disabled="_sending" />
 
             @* ── Formatted preview ── *@
             @if (_formattedPreview is not null && _validationError is null)
@@ -89,7 +89,8 @@
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Preview (formatted)</MudText>
                     <MudPaper Class="pa-3" Elevation="0"
                               Style="background:var(--mud-palette-surface); border-radius:6px; overflow:auto; max-height:260px; border:1px solid var(--mud-palette-divider);">
-                        <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color:var(--mud-palette-text-primary);">@_formattedPreview</pre>
+                        <pre
+                            style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:0.82rem; font-family:'Cascadia Code','Fira Code','Consolas',monospace; color:var(--mud-palette-text-primary);">@_formattedPreview</pre>
                     </MudPaper>
                 </MudStack>
             }
@@ -105,7 +106,7 @@
                    ButtonType="ButtonType.Button">
             @if (_sending)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 <span>Sending…</span>
             }
             else
@@ -125,8 +126,8 @@
     private string? _formattedPreview;
     private string? _validationError;
     private string? _sessionId;
-    private bool    _sending;
-    private bool    _loadingSubscriptions;
+    private bool _sending;
+    private bool _loadingSubscriptions;
 
     /// <summary>Names of subscriptions that have RequiresSession = true.</summary>
     private List<string> _sessionSubNames = [];
@@ -147,13 +148,13 @@
                 .Select(s => s.Name)
                 .ToList();
 
-            _allRequireSessions  = subs.Count > 0 && _sessionSubNames.Count == subs.Count;
+            _allRequireSessions = subs.Count > 0 && _sessionSubNames.Count == subs.Count;
             _someRequireSessions = !_allRequireSessions && _sessionSubNames.Count > 0;
         }
         catch
         {
             // Non-fatal — degrade gracefully: treat field as plain optional
-            _sessionSubNames    = [];
+            _sessionSubNames = [];
             _allRequireSessions = false;
             _someRequireSessions = false;
         }
@@ -178,7 +179,7 @@
     private void ValidateJson()
     {
         _formattedPreview = null;
-        _validationError  = null;
+        _validationError = null;
 
         if (string.IsNullOrWhiteSpace(_jsonInput))
             return;

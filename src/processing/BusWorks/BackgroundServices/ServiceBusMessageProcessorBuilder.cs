@@ -72,15 +72,14 @@ internal static class ServiceBusMessageProcessorBuilder
 
     private static MessageContext ToMessageContext(ServiceBusReceivedMessage m) => new()
     {
-        MessageId             = m.MessageId,
-        SessionId             = m.SessionId,
-        CorrelationId         = m.CorrelationId,
-        DeliveryCount         = m.DeliveryCount,
-        SequenceNumber        = m.SequenceNumber,
-        EnqueuedTime          = m.EnqueuedTime,
-        ContentType           = m.ContentType,
-        Subject               = m.Subject,
+        MessageId = m.MessageId,
+        SessionId = m.SessionId,
+        CorrelationId = m.CorrelationId,
+        DeliveryCount = m.DeliveryCount,
+        SequenceNumber = m.SequenceNumber,
+        EnqueuedTime = m.EnqueuedTime,
+        ContentType = m.ContentType,
+        Subject = m.Subject,
         ApplicationProperties = m.ApplicationProperties
     };
 }
-

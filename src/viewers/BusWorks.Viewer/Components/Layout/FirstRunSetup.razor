@@ -11,7 +11,7 @@
             <MudStack AlignItems="AlignItems.Center" Spacing="2">
                 <MudIcon Icon="@Icons.Material.Filled.Hub"
                          Color="Color.Primary"
-                         Style="font-size: 4rem;"/>
+                         Style="font-size: 4rem;" />
                 <MudText Typo="Typo.h4" Align="Align.Center">Welcome to EventBus Viewer</MudText>
                 <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
                     Before you get started, please provide your Azure Service Bus connection strings.
@@ -22,7 +22,7 @@
             @* ── Form ── *@
             <MudPaper Elevation="3" Class="pa-6 rounded-lg" Style="width:100%">
                 <EditForm Model="_form" OnValidSubmit="SaveAsync">
-                    <DataAnnotationsValidator/>
+                    <DataAnnotationsValidator />
 
                     <MudStack Spacing="4">
                         <MudTextField @bind-Value="_form.AdministrationConnectionString"
@@ -35,7 +35,7 @@
                                       RequiredError="Administration connection string is required."
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
-                                      AdornmentColor="Color.Primary"/>
+                                      AdornmentColor="Color.Primary" />
 
                         <MudTextField @bind-Value="_form.ClientConnectionString"
                                       Label="Client Connection String"
@@ -47,7 +47,7 @@
                                       RequiredError="Client connection string is required."
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.Cable"
-                                      AdornmentColor="Color.Secondary"/>
+                                      AdornmentColor="Color.Secondary" />
 
                         @if (_errorMessage is not null)
                         {
@@ -130,6 +130,7 @@
             _saving = false;
         }
     }
+
 }
 
 

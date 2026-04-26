@@ -33,15 +33,20 @@ public sealed class ServiceBusTelemetryTests
     }
 
     [Fact]
-    public void CreateMessageSpan_QueueEndpoint_ReturnsDisposableSpan()
+    public void CreateMessageSpan_QueueEndpoint_ReturnsDisposableResult()
     {
         ServiceBusEndpoint endpoint = new("orders-queue");
         ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(
             body: BinaryData.FromString("{}"),
             messageId: Guid.NewGuid().ToString(),
             deliveryCount: 1);
-        TelemetrySpan span = Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
-        Should.NotThrow(span.Dispose);
+
+        using ServiceBusTelemetry.MessageSpanResult result =
+            Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
+
+        result.Span.ShouldNotBeNull();
+        result.EnvelopeTraceparent.ShouldNotBeNullOrWhiteSpace();
+        Should.NotThrow(result.Span.Dispose);
     }
 
     [Fact]
@@ -51,10 +56,11 @@ public sealed class ServiceBusTelemetryTests
         ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(
             body: BinaryData.FromString("{}"),
             messageId: Guid.NewGuid().ToString());
+
         Should.NotThrow(() =>
         {
-            TelemetrySpan span = Telemetry.CreateMessageSpan("ParkConsumer", endpoint, message);
-            span.Dispose();
+            using ServiceBusTelemetry.MessageSpanResult result =
+                Telemetry.CreateMessageSpan("ParkConsumer", endpoint, message);
         });
     }
 
@@ -66,10 +72,11 @@ public sealed class ServiceBusTelemetryTests
             body: BinaryData.FromString("{}"),
             messageId: Guid.NewGuid().ToString(),
             correlationId: Guid.NewGuid().ToString());
+
         Should.NotThrow(() =>
         {
-            TelemetrySpan span = Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
-            span.Dispose();
+            using ServiceBusTelemetry.MessageSpanResult result =
+                Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
         });
     }
 
@@ -86,11 +93,75 @@ public sealed class ServiceBusTelemetryTests
             messageId: Guid.NewGuid().ToString(),
             enqueuedTime: DateTimeOffset.UtcNow,
             properties: props);
+
         Should.NotThrow(() =>
         {
-            TelemetrySpan span = Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
-            span.Dispose();
+            using ServiceBusTelemetry.MessageSpanResult result =
+                Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
         });
+    }
+
+    [Fact]
+    public void CreateMessageSpan_FirstDelivery_EnvelopeTraceparentIsValidW3C()
+    {
+        ServiceBusEndpoint endpoint = new("orders-queue");
+        ServiceBusReceivedMessage message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+            body: BinaryData.FromString("{}"),
+            messageId: Guid.NewGuid().ToString(),
+            deliveryCount: 1);
+
+        using ServiceBusTelemetry.MessageSpanResult result =
+            Telemetry.CreateMessageSpan("OrderConsumer", endpoint, message);
+
+        // W3C traceparent format: 00-<32 hex traceId>-<16 hex spanId>-<2 hex flags>
+        result.EnvelopeTraceparent.ShouldMatch(@"^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$");
+    }
+
+    [Fact]
+    public void CreateMessageSpan_Retry_UsesEnvelopeTraceparentFromMessageProperty()
+    {
+        ServiceBusEndpoint endpoint = new("orders-queue");
+        string messageId = Guid.NewGuid().ToString();
+
+        // Simulate first delivery to capture the envelope traceparent.
+        ServiceBusReceivedMessage firstMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(
+            body: BinaryData.FromString("{}"),
+            messageId: messageId,
+            deliveryCount: 1);
+
+        string envelopeTraceparent;
+        using (ServiceBusTelemetry.MessageSpanResult first =
+               Telemetry.CreateMessageSpan("OrderConsumer", endpoint, firstMessage))
+        {
+            envelopeTraceparent = first.EnvelopeTraceparent;
+        }
+
+        // Simulate retry: message now carries the envelope traceparent property.
+        var retryProps = new Dictionary<string, object>
+        {
+            [ServiceBusTelemetry.RetryTraceparentKey] = envelopeTraceparent
+        };
+        ServiceBusReceivedMessage retryMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(
+            body: BinaryData.FromString("{}"),
+            messageId: messageId,
+            deliveryCount: 2,
+            properties: retryProps);
+
+        using ServiceBusTelemetry.MessageSpanResult retryResult =
+            Telemetry.CreateMessageSpan("OrderConsumer", endpoint, retryMessage);
+
+        // Retry attempt should carry the same envelope traceparent back to the caller.
+        retryResult.EnvelopeTraceparent.ShouldBe(envelopeTraceparent);
+    }
+
+    [Fact]
+    public void BuildAbandonProperties_ContainsRetryTraceparentKey()
+    {
+        const string traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        Dictionary<string, object> props = ServiceBusTelemetry.BuildAbandonProperties(traceparent);
+
+        props.ShouldContainKey(ServiceBusTelemetry.RetryTraceparentKey);
+        props[ServiceBusTelemetry.RetryTraceparentKey].ShouldBe(traceparent);
     }
 
     [Fact]

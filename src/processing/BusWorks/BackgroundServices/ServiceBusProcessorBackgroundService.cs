@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Azure.Messaging.ServiceBus;
 using BusWorks.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,27 +22,60 @@ internal sealed class ServiceBusProcessorBackgroundService(
     private readonly ServiceBusTelemetry _telemetry = new(tracer, logger);
     private readonly List<ServiceBusProcessor> _serviceBusProcessors = [];
     private readonly List<ServiceBusSessionProcessor> _serviceBusSessionProcessors = [];
+    private readonly Lock _processorLock = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await WaitForApplicationStartup();
 
         IReadOnlyList<Type> consumerTypes = assemblyRegistry.GetConsumerTypes();
+        var configured = new List<ConfiguredProcessor>();
 
-        using TelemetrySpan startupSpan = tracer.StartActiveSpan("ServiceBus:Startup");
-        startupSpan.SetAttribute("servicebus.consumers.count", consumerTypes.Count);
-
-        int failedCount = 0;
-        foreach (Type consumerType in consumerTypes)
+        // ── Phase 1: setup
+        // Processors are created and configured under a single startup span, but
+        // StartProcessingAsync is NOT called here.  Keeping it out of this block ensures
+        // that the worker tasks the SDK spawns internally do NOT capture the startup span's
+        // ActivityContext via AsyncLocal — which would silently parent every future message
+        // span under this one-time startup trace.
+        using (TelemetrySpan startupSpan = tracer.StartActiveSpan("ServiceBus:Startup"))
         {
-            bool success = await SetupConsumerAsync(consumerType, stoppingToken);
-            if (!success) failedCount++;
-        }
+            startupSpan.SetAttribute("servicebus.consumers.count", consumerTypes.Count);
 
-        startupSpan.SetAttribute("servicebus.consumers.failed", failedCount);
-        startupSpan.SetStatus(failedCount > 0
-            ? Status.Error.WithDescription($"{failedCount} of {consumerTypes.Count} consumer(s) failed to start")
-            : Status.Ok);
+            int failedCount = 0;
+            foreach (Type consumerType in consumerTypes)
+            {
+                if (stoppingToken.IsCancellationRequested) break;
+
+                ConfiguredProcessor? result = SetupConsumer(consumerType);
+                if (result is null) failedCount++;
+                else configured.Add(result);
+            }
+
+            startupSpan.SetAttribute("servicebus.consumers.failed", failedCount);
+            startupSpan.SetStatus(failedCount > 0
+                ? Status.Error.WithDescription($"{failedCount} of {consumerTypes.Count} consumer(s) failed to start")
+                : Status.Ok);
+        }
+        // startupSpan is disposed here — Activity.Current is now null again.
+
+        // ── Phase 2: start ────────────────────────────────────────────────────────────
+        // Worker tasks the SDK spawns below have no ambient ActivityContext, so message
+        // spans will never be accidentally nested under the startup trace.
+        foreach (ConfiguredProcessor cp in configured)
+        {
+            if (stoppingToken.IsCancellationRequested) break;
+
+            if (cp.Processor is not null)
+            {
+                await cp.Processor.StartProcessingAsync(stoppingToken);
+                lock (_processorLock) { _serviceBusProcessors.Add(cp.Processor); }
+            }
+            else if (cp.SessionProcessor is not null)
+            {
+                await cp.SessionProcessor.StartProcessingAsync(stoppingToken);
+                lock (_processorLock) { _serviceBusSessionProcessors.Add(cp.SessionProcessor); }
+            }
+        }
     }
 
     private async Task WaitForApplicationStartup()
@@ -51,11 +85,11 @@ internal sealed class ServiceBusProcessorBackgroundService(
 
         var tcs = new TaskCompletionSource();
         await using CancellationTokenRegistration reg =
-            hostApplicationLifetime.ApplicationStarted.Register(() => tcs.SetResult());
+            hostApplicationLifetime.ApplicationStarted.Register(tcs.SetResult);
         await tcs.Task;
     }
 
-    private async Task<bool> SetupConsumerAsync(Type consumerType, CancellationToken stoppingToken)
+    private ConfiguredProcessor? SetupConsumer(Type consumerType)
     {
         try
         {
@@ -81,8 +115,10 @@ internal sealed class ServiceBusProcessorBackgroundService(
                     endpointDescription);
                 sessionProcessor.ProcessErrorAsync +=
                     _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Session:Error");
-                await sessionProcessor.StartProcessingAsync(stoppingToken);
-                _serviceBusSessionProcessors.Add(sessionProcessor);
+
+                consumerSetupSpan.AddEvent("consumer.configured");
+                consumerSetupSpan.SetStatus(Status.Ok);
+                return new ConfiguredProcessor(null, sessionProcessor);
             }
             else
             {
@@ -90,25 +126,28 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 ConfigureMessageHandler(processor, consumerName, processorFactory, endpoint, endpointDescription);
                 processor.ProcessErrorAsync +=
                     _telemetry.BuildErrorHandler(consumerType, endpointDescription, "ServiceBus:Error");
-                await processor.StartProcessingAsync(stoppingToken);
-                _serviceBusProcessors.Add(processor);
-            }
 
-            consumerSetupSpan.AddEvent("consumer.started");
-            consumerSetupSpan.SetStatus(Status.Ok);
-            return true;
+                consumerSetupSpan.AddEvent("consumer.configured");
+                consumerSetupSpan.SetStatus(Status.Ok);
+                return new ConfiguredProcessor(processor, null);
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to start ServiceBusConsumer: {ConsumerType}", consumerType.Name);
+            logger.LogError(ex, "Failed to setup ServiceBusConsumer: {ConsumerType}", consumerType.Name);
 
             using TelemetrySpan errorSpan = tracer.StartActiveSpan("ServiceBus:Setup:Error");
             errorSpan.SetAttribute("servicebus.consumer.type", consumerType.Name);
             errorSpan.RecordException(ex);
             errorSpan.SetStatus(Status.Error.WithDescription(ex.Message));
-            return false;
+            return null;
         }
     }
+
+    /// <summary>Holds a configured-but-not-yet-started processor ready for Phase 2 of startup.</summary>
+    private sealed record ConfiguredProcessor(
+        ServiceBusProcessor? Processor,
+        ServiceBusSessionProcessor? SessionProcessor);
 
     private ServiceBusProcessor CreateProcessor(ServiceBusEndpoint endpoint)
     {
@@ -149,12 +188,15 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         processor.ProcessMessageAsync += async args =>
         {
+            Activity.Current = null;
+
             using IServiceScope scope = serviceScopeFactory.CreateScope();
-            using TelemetrySpan messageSpan = _telemetry.CreateMessageSpan(consumerName, endpoint, args.Message);
+            using ServiceBusTelemetry.MessageSpanResult result =
+                _telemetry.CreateMessageSpan(consumerName, endpoint, args.Message);
 
             try
             {
-                messageSpan.AddEvent("message.processing.started");
+                result.Span.AddEvent("message.processing.started");
 
                 Func<ServiceBusReceivedMessage, CancellationToken, Task> process =
                     processorFactory(scope.ServiceProvider);
@@ -162,16 +204,16 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 await process(args.Message, args.CancellationToken);
                 await args.CompleteMessageAsync(args.Message, args.CancellationToken);
 
-                messageSpan.AddEvent("message.completed");
-                messageSpan.SetStatus(Status.Ok);
+                result.Span.AddEvent("message.completed");
+                result.Span.SetStatus(Status.Ok);
             }
             catch (Exception ex)
             {
-                _telemetry.HandleMessageProcessingError(messageSpan, args, ex, endpointDescription);
+                _telemetry.HandleMessageProcessingError(result.Span, args, ex, endpointDescription);
 
                 if (endpoint.MaxDeliveryCount > 0 && args.Message.DeliveryCount >= endpoint.MaxDeliveryCount)
                 {
-                    messageSpan.AddEvent("message.deadlettered");
+                    result.Span.AddEvent("message.deadlettered");
                     await args.DeadLetterMessageAsync(
                         args.Message,
                         deadLetterReason: "MaxDeliveryCountExceeded",
@@ -181,8 +223,11 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 }
                 else
                 {
-                    messageSpan.AddEvent("message.abandoned");
-                    await args.AbandonMessageAsync(args.Message, cancellationToken: args.CancellationToken);
+                    result.Span.AddEvent("message.abandoned");
+                    await args.AbandonMessageAsync(
+                        args.Message,
+                        propertiesToModify: ServiceBusTelemetry.BuildAbandonProperties(result.EnvelopeTraceparent),
+                        cancellationToken: args.CancellationToken);
                 }
             }
         };
@@ -197,13 +242,16 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         processor.ProcessMessageAsync += async args =>
         {
+            Activity.Current = null;
+
             using IServiceScope scope = serviceScopeFactory.CreateScope();
-            using TelemetrySpan messageSpan = _telemetry.CreateMessageSpan(consumerName, endpoint, args.Message);
-            messageSpan.SetAttribute("messaging.servicebus.session_id", args.SessionId);
+            using ServiceBusTelemetry.MessageSpanResult result =
+                _telemetry.CreateMessageSpan(consumerName, endpoint, args.Message);
+            result.Span.SetAttribute("messaging.servicebus.session_id", args.SessionId);
 
             try
             {
-                messageSpan.AddEvent("message.processing.started");
+                result.Span.AddEvent("message.processing.started");
 
                 Func<ServiceBusReceivedMessage, CancellationToken, Task> process =
                     processorFactory(scope.ServiceProvider);
@@ -211,8 +259,8 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 await process(args.Message, args.CancellationToken);
                 await args.CompleteMessageAsync(args.Message, args.CancellationToken);
 
-                messageSpan.AddEvent("message.completed");
-                messageSpan.SetStatus(Status.Ok);
+                result.Span.AddEvent("message.completed");
+                result.Span.SetStatus(Status.Ok);
             }
             catch (Exception ex)
             {
@@ -223,12 +271,12 @@ internal sealed class ServiceBusProcessorBackgroundService(
                     args.SessionId,
                     args.Message.MessageId);
 
-                messageSpan.RecordException(ex);
-                messageSpan.SetStatus(Status.Error.WithDescription(ex.Message));
+                result.Span.RecordException(ex);
+                result.Span.SetStatus(Status.Error.WithDescription(ex.Message));
 
                 if (endpoint.MaxDeliveryCount > 0 && args.Message.DeliveryCount >= endpoint.MaxDeliveryCount)
                 {
-                    messageSpan.AddEvent("message.deadlettered");
+                    result.Span.AddEvent("message.deadlettered");
                     await args.DeadLetterMessageAsync(
                         args.Message,
                         deadLetterReason: "MaxDeliveryCountExceeded",
@@ -238,8 +286,11 @@ internal sealed class ServiceBusProcessorBackgroundService(
                 }
                 else
                 {
-                    messageSpan.AddEvent("message.abandoned");
-                    await args.AbandonMessageAsync(args.Message, cancellationToken: args.CancellationToken);
+                    result.Span.AddEvent("message.abandoned");
+                    await args.AbandonMessageAsync(
+                        args.Message,
+                        propertiesToModify: ServiceBusTelemetry.BuildAbandonProperties(result.EnvelopeTraceparent),
+                        cancellationToken: args.CancellationToken);
                 }
             }
         };
@@ -249,7 +300,18 @@ internal sealed class ServiceBusProcessorBackgroundService(
     {
         await base.StopAsync(cancellationToken);
 
-        foreach (ServiceBusProcessor processor in _serviceBusProcessors)
+        List<ServiceBusProcessor> processorSnapshot;
+        List<ServiceBusSessionProcessor> sessionSnapshot;
+        lock (_processorLock)
+        {
+            processorSnapshot = [.. _serviceBusProcessors];
+            _serviceBusProcessors.Clear();
+
+            sessionSnapshot = [.. _serviceBusSessionProcessors];
+            _serviceBusSessionProcessors.Clear();
+        }
+
+        foreach (ServiceBusProcessor processor in processorSnapshot)
         {
             try
             {
@@ -259,9 +321,7 @@ internal sealed class ServiceBusProcessorBackgroundService(
             catch (Exception ex) { logger.LogError(ex, "Error stopping ServiceBusProcessor"); }
         }
 
-        _serviceBusProcessors.Clear();
-
-        foreach (ServiceBusSessionProcessor processor in _serviceBusSessionProcessors)
+        foreach (ServiceBusSessionProcessor processor in sessionSnapshot)
         {
             try
             {
@@ -270,7 +330,5 @@ internal sealed class ServiceBusProcessorBackgroundService(
             }
             catch (Exception ex) { logger.LogError(ex, "Error stopping ServiceBusSessionProcessor"); }
         }
-
-        _serviceBusSessionProcessors.Clear();
     }
 }

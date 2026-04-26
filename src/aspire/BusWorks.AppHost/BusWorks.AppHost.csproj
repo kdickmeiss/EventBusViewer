@@ -6,8 +6,8 @@
     </PropertyGroup>
     
     <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.2.1" />
-      <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="13.2.1" />
+      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.2.4" />
+      <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="13.2.4" />
     </ItemGroup>
     
     <ItemGroup>

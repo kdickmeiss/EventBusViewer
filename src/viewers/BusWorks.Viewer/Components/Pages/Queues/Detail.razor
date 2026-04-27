@@ -4,6 +4,7 @@
 @using BusWorks.Viewer.Services
 @inject QueueService QueueService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>@QueueName — Queue Detail</PageTitle>
 
@@ -44,6 +45,13 @@
             <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" />
             <MudText Typo="Typo.h5">@_detail.Name</MudText>
             <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Send"
+                       Size="Size.Small"
+                       OnClick="OpenSendDialogAsync">
+                Send Message
+            </MudButton>
             <MudChip T="string"
                      Color="@(_detail.Status == "Active" ? Color.Success : Color.Warning)"
                      Variant="Variant.Filled"
@@ -283,6 +291,32 @@
 
     private Task LoadMoreActiveAsync() => LoadActivePageAsync();
     private Task LoadMoreDeadLetterAsync() => LoadDeadLetterPageAsync();
+
+    private async Task OpenSendDialogAsync()
+    {
+        if (_detail is null) return;
+
+        var parameters = new DialogParameters<SendMessageDialog>
+        {
+            { x => x.QueueName, _detail.Name },
+            { x => x.RequiresSession, _detail.RequiresSession }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            CloseButton = true
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<SendMessageDialog>(
+            $"Send Message — {_detail.Name}", parameters, options);
+
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+            await LoadAllAsync();
+    }
 
     private static string FormatBool(bool value) => value ? "Yes" : "No";
     private static string FormatCount(int count) => count >= 250 ? "250+" : count.ToString();

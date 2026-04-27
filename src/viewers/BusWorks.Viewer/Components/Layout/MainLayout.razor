@@ -4,7 +4,7 @@
 @implements IDisposable
 @inject SettingsService SettingsService
 
-<MudThemeProvider IsDarkMode="@SettingsService.App.IsDarkMode" />
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="@SettingsService.App.IsDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />

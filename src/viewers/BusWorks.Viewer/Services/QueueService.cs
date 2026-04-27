@@ -4,16 +4,11 @@ using BusWorks.Viewer.Models;
 
 namespace BusWorks.Viewer.Services;
 
-public sealed class QueueService
+public sealed class QueueService(ServiceBusClientProvider clients)
 {
-    private readonly ServiceBusClientProvider _clients;
-
-    public QueueService(ServiceBusClientProvider clients) => _clients = clients;
-
-    private ServiceBusAdministrationClient AdminClient => _clients.AdminClient;
-    private ServiceBusClient BusClient => _clients.BusClient;
-
-
+    private ServiceBusAdministrationClient AdminClient => clients.AdminClient;
+    private ServiceBusClient BusClient => clients.BusClient;
+    
     /// <summary>
     /// Returns every queue with its active and dead-letter message counts (peek-based).
     /// </summary>

@@ -11,8 +11,6 @@ namespace BusWorks.Viewer.Services;
 public sealed class ServiceBusClientProvider : IDisposable
 {
     private readonly SettingsService _settings;
-
-    private ServiceBusAdministrationClient? _adminClient;
     private ServiceBusClient? _busClient;
     private string? _lastAdminCs;
     private string? _lastClientCs;
@@ -24,15 +22,17 @@ public sealed class ServiceBusClientProvider : IDisposable
     }
 
     /// <summary>Lazily created admin client — recreated when the connection string changes.</summary>
-    public ServiceBusAdministrationClient AdminClient
+    public ServiceBusAdministrationClient? AdminClient
     {
         get
         {
             string cs = _settings.ServiceBus.AdministrationConnectionString;
-            if (_adminClient is not null && _lastAdminCs == cs) return _adminClient;
+            if (field is not null && _lastAdminCs == cs) return field;
             _lastAdminCs = cs;
-            return _adminClient = new ServiceBusAdministrationClient(cs);
+            return field = new ServiceBusAdministrationClient(cs);
         }
+
+        private set;
     }
 
     /// <summary>Lazily created bus client — recreated when the connection string changes.</summary>
@@ -51,9 +51,9 @@ public sealed class ServiceBusClientProvider : IDisposable
     }
 
     /// <summary>Forces both clients to be recreated on next access.</summary>
-    public void Invalidate()
+    private void Invalidate()
     {
-        _adminClient = null;
+        AdminClient = null;
         _lastAdminCs = null;
         _lastClientCs = null;
         ServiceBusClient? old = _busClient;
